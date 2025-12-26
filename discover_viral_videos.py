@@ -61,6 +61,43 @@ class ViralVideoDiscovery:
             print(f"❌ Erreur inattendue: {e}")
             return []
 
+    def filter_music(self, videos):
+        """Filtre les vidéos musicales et clips"""
+        filtered = []
+
+        # Mots-clés à exclure dans le titre ou la description
+        music_keywords = [
+            'official video', 'official music video', 'music video',
+            'official audio', 'official mv', 'lyric video', 'lyrics',
+            '(official)', '[official]', 'mv', 'vevo', 'topic',
+            'full album', 'audio official', 'visualizer'
+        ]
+
+        # Suffixes de chaînes à exclure
+        channel_suffixes = ['- Topic', 'VEVO', 'Topic', 'Records']
+
+        for video in videos:
+            snippet = video['snippet']
+            title = snippet['title'].lower()
+            channel_title = snippet['channelTitle']
+            category_id = snippet.get('categoryId', '')
+
+            # Exclure si c'est dans la catégorie Music (10)
+            if category_id == '10':
+                continue
+
+            # Exclure si le titre contient des mots-clés musicaux
+            if any(keyword in title for keyword in music_keywords):
+                continue
+
+            # Exclure si la chaîne se termine par des suffixes musicaux
+            if any(channel_title.endswith(suffix) for suffix in channel_suffixes):
+                continue
+
+            filtered.append(video)
+
+        return filtered
+
     def filter_by_duration(self, videos):
         """Filtre les vidéos de moins de 15 minutes"""
         filtered = []
@@ -162,11 +199,15 @@ class ViralVideoDiscovery:
         videos = self.get_trending_videos(region_code=region_code, max_results=50)
         print(f"✅ {len(videos)} vidéos tendance récupérées")
 
-        # 2. Filtrer par durée
+        # 2. Filtrer les vidéos musicales/clips
+        videos = self.filter_music(videos)
+        print(f"✅ {len(videos)} vidéos (musique exclue)")
+
+        # 3. Filtrer par durée
         videos = self.filter_by_duration(videos)
         print(f"✅ {len(videos)} vidéos < {self.max_duration_minutes} min")
 
-        # 3. Filtrer par âge
+        # 4. Filtrer par âge
         videos = self.filter_by_age(videos)
         print(f"✅ {len(videos)} vidéos < {self.max_age_hours}h")
 
@@ -174,18 +215,18 @@ class ViralVideoDiscovery:
             print(f"⚠️  Aucune vidéo ne correspond aux critères")
             return []
 
-        # 4. Calculer les scores de viralité
+        # 5. Calculer les scores de viralité
         print(f"\n📊 Calcul des scores de viralité...")
         for video in tqdm(videos, desc="Analyse"):
             self.calculate_virality_score(video)
 
-        # 5. Trier par score décroissant
+        # 6. Trier par score décroissant
         videos.sort(key=lambda v: v['virality_score'], reverse=True)
 
-        # 6. Sélectionner le top N
+        # 7. Sélectionner le top N
         top_videos = videos[:top_n]
 
-        # 7. Afficher les résultats
+        # 8. Afficher les résultats
         print(f"\n{'='*60}")
         print(f"🏆 TOP {top_n} VIDÉOS VIRALES - {language.upper()}")
         print(f"{'='*60}\n")

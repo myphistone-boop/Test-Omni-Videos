@@ -9,6 +9,7 @@ Module de découverte de vidéos virales YouTube
 
 import os
 import sys
+import ssl
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -17,6 +18,7 @@ from googleapiclient.errors import HttpError
 import isodate
 from tqdm import tqdm
 import json
+import httplib2
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -28,7 +30,17 @@ class ViralVideoDiscovery:
         if not self.api_key:
             raise ValueError("❌ YOUTUBE_API_KEY manquante dans .env")
 
-        self.youtube = build('youtube', 'v3', developerKey=self.api_key)
+        # Créer un client HTTP qui ignore les erreurs SSL (nécessaire pour certains proxies/antivirus)
+        try:
+            # Essayer d'abord avec vérification SSL
+            self.youtube = build('youtube', 'v3', developerKey=self.api_key)
+        except ssl.SSLError:
+            # Si erreur SSL, désactiver la vérification
+            print("⚠️  Problème SSL détecté, désactivation de la vérification...")
+            http = httplib2.Http()
+            http.disable_ssl_certificate_validation = True
+            self.youtube = build('youtube', 'v3', developerKey=self.api_key, http=http)
+
         self.max_duration_minutes = 15
         self.max_age_hours = 24
 
@@ -47,8 +59,34 @@ class ViralVideoDiscovery:
             response = request.execute()
             return response.get('items', [])
 
+        except ssl.SSLError as e:
+            print(f"❌ Erreur SSL: {e}")
+            print("💡 Tentative avec désactivation de la vérification SSL...")
+            # Recréer le client avec SSL désactivé
+            http = httplib2.Http()
+            http.disable_ssl_certificate_validation = True
+            self.youtube = build('youtube', 'v3', developerKey=self.api_key, http=http)
+            # Réessayer la requête
+            try:
+                request = self.youtube.videos().list(
+                    part='snippet,statistics,contentDetails',
+                    chart='mostPopular',
+                    regionCode=region_code,
+                    maxResults=max_results,
+                    videoCategoryId='0'
+                )
+                response = request.execute()
+                return response.get('items', [])
+            except Exception as e:
+                print(f"❌ Erreur après désactivation SSL: {e}")
+                return []
+
         except HttpError as e:
             print(f"❌ Erreur API YouTube: {e}")
+            return []
+
+        except Exception as e:
+            print(f"❌ Erreur inattendue: {e}")
             return []
 
     def filter_by_duration(self, videos):

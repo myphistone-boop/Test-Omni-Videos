@@ -2116,6 +2116,26 @@ def main():
         sys.exit(1)
 
 
+def process_video(youtube_url, output_path=None):
+    """
+    Fonction simple pour traiter une vidéo YouTube (utilisable depuis d'autres scripts)
+
+    Args:
+        youtube_url: URL de la vidéo YouTube
+        output_path: Chemin de sortie optionnel (si None, généré automatiquement)
+
+    Returns:
+        bool: True en cas de succès, False en cas d'erreur
+    """
+    try:
+        generator = YouTubeSubtitleGenerator()
+        generator.traiter_video(url=youtube_url, etape_depart=1)
+        return True
+    except Exception as e:
+        print(f"❌ Erreur lors du traitement: {e}")
+        return False
+
+
 if __name__ == "__main__":
     main()
 

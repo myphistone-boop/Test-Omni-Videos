@@ -9,7 +9,7 @@ Module de découverte de vidéos virales YouTube
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -79,7 +79,7 @@ class ViralVideoDiscovery:
     def filter_by_age(self, videos):
         """Filtre les vidéos de moins de 24h"""
         filtered = []
-        now = datetime.now(datetime.timezone.utc)
+        now = datetime.now(timezone.utc)
         cutoff = now - timedelta(hours=self.max_age_hours)
 
         for video in videos:

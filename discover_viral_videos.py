@@ -109,10 +109,11 @@ class ViralVideoDiscovery:
             'official trailer', 'movie trailer', 'game trailer',
             'coming soon', 'announce trailer', 'reveal trailer',
 
-            # Lives & Streams
-            'live', 'livestream', 'live stream', 'en direct',
-            'stream', 'streaming', 'replay', 'rediffusion',
-            'full stream', 'vod', 'twitch',
+            # Lives & Streams (uniquement les formats longs)
+            'livestream', 'live stream', 'en direct',
+            'streaming now', 'replay', 'rediffusion',
+            'full stream', 'vod', 'twitch replay',
+            '🔴 live', '[live]', '(live)',
 
             # Podcasts & Interviews longues
             'podcast', 'full episode', 'episode complet',
@@ -168,8 +169,8 @@ class ViralVideoDiscovery:
             if any(keyword in title for keyword in excluded_keywords):
                 continue
 
-            # Exclure si la description contient certains mots-clés critiques
-            critical_keywords = ['trailer', 'livestream', 'full episode', 'podcast']
+            # Exclure si la description contient certains mots-clés critiques (très restrictifs)
+            critical_keywords = ['official trailer', 'livestream', 'full episode', 'full podcast']
             if any(keyword in description for keyword in critical_keywords):
                 continue
 
@@ -274,7 +275,7 @@ class ViralVideoDiscovery:
         print(f"🎯 DÉCOUVERTE VIDÉOS VIRALES - {language.upper()}")
         print(f"{'='*60}")
 
-        # 1. Récupérer les vidéos tendance
+        # 1. Récupérer plus de vidéos tendance pour avoir assez après filtrage
         videos = self.get_trending_videos(region_code=region_code, max_results=50)
         print(f"✅ {len(videos)} vidéos tendance récupérées")
 
@@ -290,9 +291,23 @@ class ViralVideoDiscovery:
         videos = self.filter_by_duration(videos)
         print(f"✅ {len(videos)} vidéos < {self.max_duration_minutes} min")
 
-        # 5. Filtrer par âge
-        videos = self.filter_by_age(videos)
-        print(f"✅ {len(videos)} vidéos < {self.max_age_hours}h")
+        # 5. Filtrer par âge avec fallback progressif
+        # Essayer d'abord 24h, puis 48h, puis 72h si pas assez de résultats
+        age_limits = [24, 48, 72, 168]  # 24h, 48h, 72h, 1 semaine
+        filtered_videos = []
+
+        for age_limit in age_limits:
+            self.max_age_hours = age_limit
+            filtered_videos = self.filter_by_age(videos)
+
+            if len(filtered_videos) >= top_n:
+                print(f"✅ {len(filtered_videos)} vidéos < {age_limit}h")
+                break
+            elif age_limit == age_limits[-1]:
+                # Dernière tentative, on prend ce qu'on a
+                print(f"⚠️  Seulement {len(filtered_videos)} vidéos < {age_limit}h (critères assouplis)")
+
+        videos = filtered_videos
 
         if not videos:
             print(f"⚠️  Aucune vidéo ne correspond aux critères")
@@ -308,6 +323,10 @@ class ViralVideoDiscovery:
 
         # 8. Sélectionner le top N
         top_videos = videos[:top_n]
+
+        # Vérifier si on a assez de vidéos
+        if len(top_videos) < top_n:
+            print(f"⚠️  Seulement {len(top_videos)} vidéos trouvées (objectif: {top_n})")
 
         # 9. Afficher les résultats
         print(f"\n{'='*60}")

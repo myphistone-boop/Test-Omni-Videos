@@ -53,11 +53,34 @@ def discover_videos():
         if videos_fr or videos_en:
             output_file = discoverer.save_results(videos_fr, videos_en)
 
+            # Afficher un récapitulatif final
             print(f"\n{'='*70}")
-            print(f"✅ DÉCOUVERTE TERMINÉE")
-            print(f"   - {len(videos_fr)} vidéos FR découvertes")
-            print(f"   - {len(videos_en)} vidéos EN découvertes")
-            print(f"   - Résultats sauvegardés dans {output_file}")
+            print(f"✅ DÉCOUVERTE TERMINÉE - RÉCAPITULATIF")
+            print(f"{'='*70}")
+
+            # Vidéos FR
+            if videos_fr:
+                print(f"\n🇫🇷 {len(videos_fr)} VIDÉOS FRANÇAISES:")
+                for i, video in enumerate(videos_fr, 1):
+                    snippet = video['snippet']
+                    title_words = snippet['title'].split()[:6]
+                    short_title = ' '.join(title_words)
+                    if len(snippet['title'].split()) > 6:
+                        short_title += "..."
+                    print(f"  {i}. {short_title} - 📺 {snippet['channelTitle']}")
+
+            # Vidéos EN
+            if videos_en:
+                print(f"\n🇺🇸 {len(videos_en)} VIDÉOS ANGLAISES:")
+                for i, video in enumerate(videos_en, 1):
+                    snippet = video['snippet']
+                    title_words = snippet['title'].split()[:6]
+                    short_title = ' '.join(title_words)
+                    if len(snippet['title'].split()) > 6:
+                        short_title += "..."
+                    print(f"  {i}. {short_title} - 📺 {snippet['channelTitle']}")
+
+            print(f"\n💾 Résultats sauvegardés dans {output_file}")
             print(f"{'='*70}")
 
             return True

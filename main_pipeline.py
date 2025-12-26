@@ -100,8 +100,13 @@ def display_results():
     # Vidéos FR
     print("\n🇫🇷 VIDÉOS FRANÇAISES:")
     for i, video in enumerate(results['french_videos'], 1):
-        print(f"\n{i}. {video['title'][:60]}")
-        print(f"   📺 {video['channel']}")
+        # Limiter le titre à 6 mots
+        title_words = video['title'].split()[:6]
+        short_title = ' '.join(title_words)
+        if len(video['title'].split()) > 6:
+            short_title += "..."
+
+        print(f"\n{i}. {short_title} - 📺 {video['channel']}")
         print(f"   🔗 {video['url']}")
         print(f"   📊 Score: {video['virality_score']}/100 | "
               f"👁️  {video['views']:,} vues | "
@@ -110,8 +115,13 @@ def display_results():
     # Vidéos EN
     print("\n🇺🇸 VIDÉOS ANGLAISES:")
     for i, video in enumerate(results['english_videos'], 1):
-        print(f"\n{i}. {video['title'][:60]}")
-        print(f"   📺 {video['channel']}")
+        # Limiter le titre à 6 mots
+        title_words = video['title'].split()[:6]
+        short_title = ' '.join(title_words)
+        if len(video['title'].split()) > 6:
+            short_title += "..."
+
+        print(f"\n{i}. {short_title} - 📺 {video['channel']}")
         print(f"   🔗 {video['url']}")
         print(f"   📊 Score: {video['virality_score']}/100 | "
               f"👁️  {video['views']:,} vues | "
@@ -158,7 +168,13 @@ def manual_selection(videos):
     """Sélection manuelle des vidéos"""
     print("\n📋 VIDÉOS DISPONIBLES:")
     for i, video in enumerate(videos, 1):
-        print(f"  {i}. {video['title'][:50]} (Score: {video['virality_score']}/100)")
+        # Limiter le titre à 6 mots
+        title_words = video['title'].split()[:6]
+        short_title = ' '.join(title_words)
+        if len(video['title'].split()) > 6:
+            short_title += "..."
+
+        print(f"  {i}. {short_title} - 📺 {video['channel']} (Score: {video['virality_score']}/100)")
 
     print("\nEntrez les numéros des vidéos à traiter (séparés par des virgules)")
     print("Exemple: 1,3,5,7")
@@ -192,7 +208,13 @@ def process_selected_videos():
     # Confirmation
     print(f"\nVous allez traiter {len(selected_videos)} vidéo(s):")
     for i, video in enumerate(selected_videos, 1):
-        print(f"  {i}. {video['title'][:60]}")
+        # Limiter le titre à 6 mots
+        title_words = video['title'].split()[:6]
+        short_title = ' '.join(title_words)
+        if len(video['title'].split()) > 6:
+            short_title += "..."
+
+        print(f"  {i}. {short_title} - 📺 {video['channel']}")
 
     confirm = input("\n👉 Confirmer ? (o/N): ").strip().lower()
 
@@ -209,8 +231,14 @@ def process_selected_videos():
     fail_count = 0
 
     for i, video in enumerate(selected_videos, 1):
+        # Limiter le titre à 6 mots
+        title_words = video['title'].split()[:6]
+        short_title = ' '.join(title_words)
+        if len(video['title'].split()) > 6:
+            short_title += "..."
+
         print(f"\n{'='*70}")
-        print(f"📹 TRAITEMENT {i}/{len(selected_videos)}: {video['title'][:50]}")
+        print(f"📹 TRAITEMENT {i}/{len(selected_videos)}: {short_title} - 📺 {video['channel']}")
         print(f"{'='*70}")
 
         try:

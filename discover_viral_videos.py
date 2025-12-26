@@ -194,14 +194,15 @@ class ViralVideoDiscovery:
             snippet = video['snippet']
             stats = video['statistics']
 
-            print(f"{i}. {snippet['title'][:60]}")
-            print(f"   📺 Chaîne: {snippet['channelTitle']}")
+            # Limiter le titre à 6 mots
+            title_words = snippet['title'].split()[:6]
+            short_title = ' '.join(title_words)
+            if len(snippet['title'].split()) > 6:
+                short_title += "..."
+
+            print(f"{i}. {short_title} - 📺 {snippet['channelTitle']}")
             print(f"   🔗 https://youtube.com/watch?v={video['id']}")
-            print(f"   📊 Score viral: {video['virality_score']}/100")
-            print(f"   👁️  {int(stats['viewCount']):,} vues ({video['views_per_hour']}/h)")
-            print(f"   💬 Engagement: {video['engagement_rate']}%")
-            print(f"   ⏱️  Durée: {video['duration_minutes']:.1f} min")
-            print(f"   🕐 Âge: {video['age_hours']:.1f}h")
+            print(f"   📊 Score: {video['virality_score']}/100 | 👁️  {int(stats['viewCount']):,} vues | ⏱️  {video['duration_minutes']:.1f} min | 🕐 {video['age_hours']:.1f}h")
             print()
 
         return top_videos

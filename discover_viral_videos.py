@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Module de découverte de vidéos virales YouTube
-- Recherche les vidéos tendance de moins de 24h
+Module de découverte de vidéos virales YouTube (optimisé pour la crème de la crème)
+- Recherche les vidéos tendance des 48 dernières heures
 - Filtre par durée (<15 min)
-- Calcule un score de viralité
-- Sélectionne top 5 FR + top 5 EN
+- Calcule un score de viralité optimisé (propagation 60%, engagement 30%, fraîcheur 10%)
+- Sélectionne top 5 FR + top 5 EN parmi 200 vidéos tendance
 """
 
 import os
@@ -36,7 +36,7 @@ class ViralVideoDiscovery:
 
         self.youtube = build('youtube', 'v3', developerKey=self.api_key, http=http)
         self.max_duration_minutes = 15
-        self.max_age_hours = 24
+        self.max_age_hours = 48  # 48h pour la crème de la crème des vidéos virales
 
     def get_trending_videos(self, region_code='US', max_results=50):
         """Récupère les vidéos tendance pour une région"""
@@ -212,13 +212,13 @@ class ViralVideoDiscovery:
 
     def calculate_virality_score(self, video):
         """
-        Calcule le score de viralité d'une vidéo
+        Calcule le score de viralité d'une vidéo (optimisé pour la crème de la crème)
 
-        Score = (Propagation * 0.5) + (Engagement * 0.4) + (Fraîcheur * 0.1)
+        Score = (Propagation * 0.6) + (Engagement * 0.3) + (Fraîcheur * 0.1)
 
-        - Propagation : vues/heure (normalisé)
+        - Propagation : vues/heure (poids augmenté - meilleur indicateur de viralité)
         - Engagement : (likes + comments) / vues (normalisé)
-        - Fraîcheur : bonus pour vidéos très récentes (<12h)
+        - Fraîcheur : bonus pour vidéos très récentes (<24h)
         """
         stats = video.get('statistics', {})
 
@@ -226,7 +226,7 @@ class ViralVideoDiscovery:
         views = int(stats.get('viewCount', 0))
         likes = int(stats.get('likeCount', 0))
         comments = int(stats.get('commentCount', 0))
-        age_hours = video.get('age_hours', 24)
+        age_hours = video.get('age_hours', 48)
 
         # Éviter division par zéro
         if age_hours == 0:
@@ -234,22 +234,36 @@ class ViralVideoDiscovery:
         if views == 0:
             return 0
 
-        # 1. Score de propagation (vues/heure)
+        # 1. Score de propagation (vues/heure) - POIDS AUGMENTÉ
         views_per_hour = views / age_hours
-        propagation_score = min(views_per_hour / 10000, 100)  # Normalisé sur 100
+        # Normalisation progressive pour mieux différencier les vraies vidéos virales
+        if views_per_hour < 1000:
+            propagation_score = views_per_hour / 100  # 0-10
+        elif views_per_hour < 10000:
+            propagation_score = 10 + (views_per_hour - 1000) / 180  # 10-60
+        else:
+            propagation_score = 60 + min((views_per_hour - 10000) / 1000, 40)  # 60-100
 
-        # 2. Score d'engagement
+        propagation_score = min(propagation_score, 100)
+
+        # 2. Score d'engagement - mieux adapté pour les vraies vidéos virales
         engagement_rate = (likes + comments) / views
-        engagement_score = min(engagement_rate * 1000, 100)  # Normalisé sur 100
+        # Les vidéos virales ont généralement 2-5% d'engagement
+        engagement_score = min(engagement_rate * 2000, 100)  # Plus sensible
 
-        # 3. Score de fraîcheur
-        freshness_score = 100 if age_hours < 12 else 50
+        # 3. Score de fraîcheur - adapté pour 48h
+        if age_hours < 24:
+            freshness_score = 100  # Très frais
+        elif age_hours < 48:
+            freshness_score = 75   # Encore frais
+        else:
+            freshness_score = 50   # Moins frais
 
-        # Score final
+        # Score final - POIDS OPTIMISÉS POUR LA VIRALITÉ
         final_score = (
-            propagation_score * 0.5 +
-            engagement_score * 0.4 +
-            freshness_score * 0.1
+            propagation_score * 0.6 +  # Augmenté de 0.5 à 0.6
+            engagement_score * 0.3 +   # Réduit de 0.4 à 0.3
+            freshness_score * 0.1      # Maintenu à 0.1
         )
 
         video['virality_score'] = round(final_score, 2)
@@ -274,8 +288,8 @@ class ViralVideoDiscovery:
         print(f"🎯 DÉCOUVERTE VIDÉOS VIRALES - {language.upper()}")
         print(f"{'='*60}")
 
-        # 1. Récupérer plus de vidéos tendance pour avoir assez après filtrage
-        videos = self.get_trending_videos(region_code=region_code, max_results=100)
+        # 1. Récupérer le maximum de vidéos tendance pour sélectionner la crème de la crème
+        videos = self.get_trending_videos(region_code=region_code, max_results=200)
         print(f"✅ {len(videos)} vidéos tendance récupérées")
 
         # 2. Filtrer les vidéos musicales/clips
@@ -291,8 +305,8 @@ class ViralVideoDiscovery:
         print(f"✅ {len(videos)} vidéos < {self.max_duration_minutes} min")
 
         # 5. Filtrer par âge avec fallback progressif
-        # Essayer d'abord 24h, puis 48h, puis 72h si pas assez de résultats
-        age_limits = [24, 48, 72, 168]  # 24h, 48h, 72h, 1 semaine
+        # Optimisé pour la crème de la crème : 48h par défaut
+        age_limits = [48, 72, 168]  # 48h, 72h, 1 semaine
         filtered_videos = []
 
         for age_limit in age_limits:

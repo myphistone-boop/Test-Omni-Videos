@@ -1,0 +1,22 @@
+# OAuth credentials - NE JAMAIS COMMITER
+client_secrets.json
+client_secrets_*.json
+credentials/
+*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Tests
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

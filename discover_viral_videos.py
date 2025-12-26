@@ -104,10 +104,10 @@ class ViralVideoDiscovery:
 
         # Mots-clés de contenus NON shortables
         excluded_keywords = [
-            # Trailers & Teasers
-            'trailer', 'teaser', 'bande-annonce', 'bande annonce',
+            # Trailers & Teasers (uniquement officiels)
             'official trailer', 'movie trailer', 'game trailer',
-            'coming soon', 'announce trailer', 'reveal trailer',
+            'teaser officiel', 'bande-annonce officielle',
+            'coming soon trailer', 'announce trailer', 'reveal trailer',
 
             # Lives & Streams (uniquement les formats longs)
             'livestream', 'live stream', 'en direct',
@@ -115,9 +115,9 @@ class ViralVideoDiscovery:
             'full stream', 'vod', 'twitch replay',
             '🔴 live', '[live]', '(live)',
 
-            # Podcasts & Interviews longues
-            'podcast', 'full episode', 'episode complet',
-            'full interview', 'interview complète',
+            # Podcasts & Interviews longues (formats complets uniquement)
+            'full podcast', 'podcast complet', 'full episode', 'episode complet',
+            'full interview', 'interview complète', 'interview intégrale',
             'épisode complet', 'intégrale',
 
             # Sport en direct
@@ -135,13 +135,12 @@ class ViralVideoDiscovery:
             'let\'s play', 'playthrough', 'walkthrough',
             'no commentary', 'full game',
 
-            # Divers non shortables
-            'documentary', 'documentaire',
-            'full movie', 'film complet',
-            'full concert', 'concert complet',
-            'unboxing complet', 'review complète',
-            'study with me', 'asmr 1 hour', 'meditation',
-            'sleep music', 'relaxing music',
+            # Divers non shortables (formats longs uniquement)
+            'full documentary', 'documentaire complet',
+            'full movie', 'film complet', 'film entier',
+            'full concert', 'concert complet', 'concert entier',
+            'study with me', 'asmr 1 hour', 'meditation 1 hour',
+            'sleep music 1 hour', 'relaxing music 1 hour',
 
             # Formats trop longs
             '1 hour', '2 hours', '3 hours',
@@ -151,8 +150,8 @@ class ViralVideoDiscovery:
 
         # Catégories à exclure (IDs YouTube)
         excluded_categories = [
-            '17',  # Sports
-            '24',  # Entertainment (parfois trop générique mais peut contenir des trailers)
+            '17',  # Sports (matchs complets, highlights longs)
+            # Note: Catégorie 24 (Entertainment) retirée - trop large, exclut du bon contenu viral
         ]
 
         for video in videos:
@@ -276,7 +275,7 @@ class ViralVideoDiscovery:
         print(f"{'='*60}")
 
         # 1. Récupérer plus de vidéos tendance pour avoir assez après filtrage
-        videos = self.get_trending_videos(region_code=region_code, max_results=50)
+        videos = self.get_trending_videos(region_code=region_code, max_results=100)
         print(f"✅ {len(videos)} vidéos tendance récupérées")
 
         # 2. Filtrer les vidéos musicales/clips

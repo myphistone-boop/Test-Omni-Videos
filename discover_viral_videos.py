@@ -98,6 +98,85 @@ class ViralVideoDiscovery:
 
         return filtered
 
+    def filter_non_shortable(self, videos):
+        """Filtre les vidéos non adaptées pour des shorts TikTok"""
+        filtered = []
+
+        # Mots-clés de contenus NON shortables
+        excluded_keywords = [
+            # Trailers & Teasers
+            'trailer', 'teaser', 'bande-annonce', 'bande annonce',
+            'official trailer', 'movie trailer', 'game trailer',
+            'coming soon', 'announce trailer', 'reveal trailer',
+
+            # Lives & Streams
+            'live', 'livestream', 'live stream', 'en direct',
+            'stream', 'streaming', 'replay', 'rediffusion',
+            'full stream', 'vod', 'twitch',
+
+            # Podcasts & Interviews longues
+            'podcast', 'full episode', 'episode complet',
+            'full interview', 'interview complète',
+            'épisode complet', 'intégrale',
+
+            # Sport en direct
+            'full match', 'match complet', 'full game',
+            'highlights extended', 'extended highlights',
+            'match en entier', 'football match', 'basketball game',
+
+            # Conférences & Webinaires
+            'conference', 'webinar', 'webinaire',
+            'keynote', 'présentation complète',
+            'full presentation', 'full talk',
+
+            # Gaming longue durée
+            'full gameplay', 'gameplay complet',
+            'let\'s play', 'playthrough', 'walkthrough',
+            'no commentary', 'full game',
+
+            # Divers non shortables
+            'documentary', 'documentaire',
+            'full movie', 'film complet',
+            'full concert', 'concert complet',
+            'unboxing complet', 'review complète',
+            'study with me', 'asmr 1 hour', 'meditation',
+            'sleep music', 'relaxing music',
+
+            # Formats trop longs
+            '1 hour', '2 hours', '3 hours',
+            '1h', '2h', '3h',
+            'compilation 1h', 'best of 1h',
+        ]
+
+        # Catégories à exclure (IDs YouTube)
+        excluded_categories = [
+            '17',  # Sports
+            '24',  # Entertainment (parfois trop générique mais peut contenir des trailers)
+        ]
+
+        for video in videos:
+            snippet = video['snippet']
+            title = snippet['title'].lower()
+            description = snippet.get('description', '').lower()[:200]  # Premiers 200 chars
+            category_id = snippet.get('categoryId', '')
+
+            # Exclure si catégorie non désirée
+            if category_id in excluded_categories:
+                continue
+
+            # Exclure si le titre contient des mots-clés exclus
+            if any(keyword in title for keyword in excluded_keywords):
+                continue
+
+            # Exclure si la description contient certains mots-clés critiques
+            critical_keywords = ['trailer', 'livestream', 'full episode', 'podcast']
+            if any(keyword in description for keyword in critical_keywords):
+                continue
+
+            filtered.append(video)
+
+        return filtered
+
     def filter_by_duration(self, videos):
         """Filtre les vidéos de moins de 15 minutes"""
         filtered = []
@@ -203,11 +282,15 @@ class ViralVideoDiscovery:
         videos = self.filter_music(videos)
         print(f"✅ {len(videos)} vidéos (musique exclue)")
 
-        # 3. Filtrer par durée
+        # 3. Filtrer les contenus non shortables (trailers, lives, etc.)
+        videos = self.filter_non_shortable(videos)
+        print(f"✅ {len(videos)} vidéos (shortables uniquement)")
+
+        # 4. Filtrer par durée
         videos = self.filter_by_duration(videos)
         print(f"✅ {len(videos)} vidéos < {self.max_duration_minutes} min")
 
-        # 4. Filtrer par âge
+        # 5. Filtrer par âge
         videos = self.filter_by_age(videos)
         print(f"✅ {len(videos)} vidéos < {self.max_age_hours}h")
 
@@ -215,18 +298,18 @@ class ViralVideoDiscovery:
             print(f"⚠️  Aucune vidéo ne correspond aux critères")
             return []
 
-        # 5. Calculer les scores de viralité
+        # 6. Calculer les scores de viralité
         print(f"\n📊 Calcul des scores de viralité...")
         for video in tqdm(videos, desc="Analyse"):
             self.calculate_virality_score(video)
 
-        # 6. Trier par score décroissant
+        # 7. Trier par score décroissant
         videos.sort(key=lambda v: v['virality_score'], reverse=True)
 
-        # 7. Sélectionner le top N
+        # 8. Sélectionner le top N
         top_videos = videos[:top_n]
 
-        # 8. Afficher les résultats
+        # 9. Afficher les résultats
         print(f"\n{'='*60}")
         print(f"🏆 TOP {top_n} VIDÉOS VIRALES - {language.upper()}")
         print(f"{'='*60}\n")

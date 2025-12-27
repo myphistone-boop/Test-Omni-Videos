@@ -168,6 +168,8 @@ def test_upload_quota_check(youtube):
 def main():
     parser = argparse.ArgumentParser(description='Test léger de l\'accès au compte YouTube')
     parser.add_argument('--account', required=True, help='ID du compte à tester (ex: compte_test_1)')
+    parser.add_argument('--no-ssl-verify', action='store_true',
+                        help='Désactiver la vérification SSL (proxy d\'entreprise)')
 
     args = parser.parse_args()
     account_id = args.account
@@ -179,7 +181,7 @@ def main():
 
     # Authentification
     try:
-        authenticator = YouTubeAuthenticator()
+        authenticator = YouTubeAuthenticator(disable_ssl_verify=args.no_ssl_verify)
 
         # Vérifier que le compte est déjà authentifié
         credentials_file = authenticator.credentials_dir / f'{account_id}.json'

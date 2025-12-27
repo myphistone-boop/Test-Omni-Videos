@@ -7,10 +7,15 @@ Gestion des credentials pour upload de vidéos
 import os
 import sys
 import pickle
+import warnings
 from pathlib import Path
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+
+# Pour désactiver la vérification SSL si nécessaire (proxy d'entreprise)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Scopes nécessaires pour gérer le compte YouTube
 # youtube.upload: Upload de vidéos
@@ -24,12 +29,13 @@ SCOPES = [
 class YouTubeAuthenticator:
     """Gère l'authentification OAuth 2.0 pour YouTube"""
 
-    def __init__(self, client_secrets_file='client_secrets.json'):
+    def __init__(self, client_secrets_file='client_secrets.json', disable_ssl_verify=False):
         """
         Initialise l'authenticateur
 
         Args:
             client_secrets_file: Chemin vers le fichier OAuth client secrets
+            disable_ssl_verify: Désactive la vérification SSL (pour proxy d'entreprise)
         """
         # Trouver la racine du projet (dossier parent de youtube_upload)
         current_dir = Path(__file__).parent
@@ -41,6 +47,11 @@ class YouTubeAuthenticator:
         # Credentials dans youtube_upload/credentials/
         self.credentials_dir = current_dir / 'credentials'
         self.credentials_dir.mkdir(parents=True, exist_ok=True)
+
+        # Option pour désactiver SSL (proxy d'entreprise)
+        self.disable_ssl_verify = disable_ssl_verify
+        if self.disable_ssl_verify:
+            print("⚠️  Vérification SSL désactivée (mode proxy d'entreprise)")
 
     def get_authenticated_service(self, account_id):
         """
@@ -93,6 +104,18 @@ class YouTubeAuthenticator:
                     self.client_secrets_file,
                     SCOPES
                 )
+
+                # Désactiver SSL si nécessaire (proxy d'entreprise)
+                if self.disable_ssl_verify:
+                    # Patcher la session OAuth pour désactiver SSL
+                    original_request = flow.oauth2session.request
+
+                    def patched_request(*args, **kwargs):
+                        kwargs['verify'] = False
+                        return original_request(*args, **kwargs)
+
+                    flow.oauth2session.request = patched_request
+
                 credentials = flow.run_local_server(
                     port=0,
                     prompt='consent',
@@ -165,10 +188,12 @@ def main():
     parser = argparse.ArgumentParser(description='Authentification YouTube OAuth 2.0')
     parser.add_argument('--account', type=str, help='ID du compte à authentifier')
     parser.add_argument('--list', action='store_true', help='Lister les comptes authentifiés')
+    parser.add_argument('--no-ssl-verify', action='store_true',
+                        help='Désactiver la vérification SSL (proxy d\'entreprise)')
 
     args = parser.parse_args()
 
-    auth = YouTubeAuthenticator()
+    auth = YouTubeAuthenticator(disable_ssl_verify=args.no_ssl_verify)
 
     if args.list:
         auth.list_authenticated_accounts()
@@ -177,6 +202,7 @@ def main():
     else:
         print("Usage:")
         print("  python youtube_auth.py --account compte_test_1")
+        print("  python youtube_auth.py --account compte_test_1 --no-ssl-verify")
         print("  python youtube_auth.py --list")
 
 

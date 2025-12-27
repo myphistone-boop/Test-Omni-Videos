@@ -18,9 +18,13 @@ from accounts_config import get_account_config
 class YouTubeUploader:
     """Gère l'upload de vidéos sur YouTube"""
 
-    def __init__(self):
-        """Initialise l'uploader"""
-        self.authenticator = YouTubeAuthenticator()
+    def __init__(self, disable_ssl_verify=False):
+        """Initialise l'uploader
+
+        Args:
+            disable_ssl_verify: Désactive la vérification SSL (pour proxy d'entreprise)
+        """
+        self.authenticator = YouTubeAuthenticator(disable_ssl_verify=disable_ssl_verify)
         self.metadata_generator = MetadataGenerator()
 
     def upload_video(self, video_path, original_title, account_id, custom_metadata=None):
@@ -200,6 +204,8 @@ def main():
     parser.add_argument('--video', type=str, help='Chemin vers la vidéo')
     parser.add_argument('--title', type=str, help='Titre original')
     parser.add_argument('--account', type=str, default='compte_test_1', help='ID du compte')
+    parser.add_argument('--no-ssl-verify', action='store_true',
+                        help='Désactiver la vérification SSL (proxy d\'entreprise)')
 
     args = parser.parse_args()
 
@@ -207,7 +213,7 @@ def main():
         print("Usage: python youtube_uploader.py --video path/to/video.mp4 --title 'Original Title'")
         sys.exit(1)
 
-    uploader = YouTubeUploader()
+    uploader = YouTubeUploader(disable_ssl_verify=args.no_ssl_verify)
     uploader.upload_video(args.video, args.title, args.account)
 
 

@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 
 from youtube_auth import YouTubeAuthenticator
-from googleapiclient.discovery import build
 
 
 def get_channel_info(youtube):
@@ -181,16 +180,17 @@ def main():
     # Authentification
     try:
         authenticator = YouTubeAuthenticator()
-        credentials = authenticator.get_credentials(account_id)
 
-        if not credentials:
-            print(f"\n❌ Authentification échouée pour {account_id}")
+        # Vérifier que le compte est déjà authentifié
+        credentials_file = authenticator.credentials_dir / f'{account_id}.json'
+        if not credentials_file.exists():
+            print(f"\n❌ Compte non authentifié: {account_id}")
             print(f"\n💡 Lancez d'abord:")
             print(f"   python youtube_auth.py --account {account_id}")
             return 1
 
-        # Construire le service YouTube
-        youtube = build('youtube', 'v3', credentials=credentials)
+        # Obtenir le service YouTube authentifié
+        youtube = authenticator.get_authenticated_service(account_id)
 
         # Test 1: Infos du canal
         if not get_channel_info(youtube):

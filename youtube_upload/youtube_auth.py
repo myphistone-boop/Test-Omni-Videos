@@ -12,8 +12,13 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-# Scopes nécessaires pour uploader des vidéos
-SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+# Scopes nécessaires pour gérer le compte YouTube
+# youtube.upload: Upload de vidéos
+# youtube.force-ssl: Gestion des playlists, infos canal, etc.
+SCOPES = [
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.force-ssl'
+]
 
 
 class YouTubeAuthenticator:

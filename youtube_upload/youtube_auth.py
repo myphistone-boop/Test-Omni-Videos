@@ -26,8 +26,15 @@ class YouTubeAuthenticator:
         Args:
             client_secrets_file: Chemin vers le fichier OAuth client secrets
         """
-        self.client_secrets_file = client_secrets_file
-        self.credentials_dir = Path('youtube_upload/credentials')
+        # Trouver la racine du projet (dossier parent de youtube_upload)
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent
+
+        # Chercher client_secrets.json à la racine du projet
+        self.client_secrets_file = project_root / client_secrets_file
+
+        # Credentials dans youtube_upload/credentials/
+        self.credentials_dir = current_dir / 'credentials'
         self.credentials_dir.mkdir(parents=True, exist_ok=True)
 
     def get_authenticated_service(self, account_id):
@@ -40,6 +47,17 @@ class YouTubeAuthenticator:
         Returns:
             Service YouTube API authentifié
         """
+        # Vérifier que client_secrets.json existe
+        if not self.client_secrets_file.exists():
+            print(f"\n❌ ERREUR: Fichier client_secrets.json introuvable !")
+            print(f"📍 Cherché dans: {self.client_secrets_file}")
+            print("\n💡 Instructions:")
+            print("1. Téléchargez le fichier OAuth depuis Google Cloud Console")
+            print("2. Renommez-le en 'client_secrets.json'")
+            print("3. Placez-le à la RACINE du projet:")
+            print(f"   {self.client_secrets_file.parent}/")
+            raise FileNotFoundError(f"client_secrets.json non trouvé dans {self.client_secrets_file.parent}")
+
         credentials_file = self.credentials_dir / f'{account_id}.json'
         credentials = None
 

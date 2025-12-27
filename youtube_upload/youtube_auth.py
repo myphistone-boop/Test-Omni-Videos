@@ -129,7 +129,14 @@ class YouTubeAuthenticator:
             print(f"✅ Authentification réussie pour {account_id}")
             print(f"💾 Credentials sauvegardés: {credentials_file}\n")
 
-        return build('youtube', 'v3', credentials=credentials)
+        # Construire le service YouTube avec SSL désactivé si nécessaire
+        if self.disable_ssl_verify:
+            import httplib2
+            http = httplib2.Http()
+            http.disable_ssl_certificate_validation = True
+            return build('youtube', 'v3', credentials=credentials, http=http)
+        else:
+            return build('youtube', 'v3', credentials=credentials)
 
     def authenticate_account(self, account_id):
         """

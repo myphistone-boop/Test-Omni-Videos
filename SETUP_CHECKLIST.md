@@ -64,7 +64,33 @@ Should show: ✅ compte_test_1
 
 ---
 
-#### Step 4: Test Upload (Dry Run)
+#### Step 4: Test Léger (RECOMMANDÉ - Sans Upload)
+
+**Avant d'uploader une vidéo, testez l'accès au compte avec des actions légères:**
+
+```bash
+cd youtube_upload
+python test_account_access.py --account compte_test_1
+```
+
+**Ce script va:**
+- ✅ Vérifier l'authentification
+- 📺 Afficher les infos de votre canal (nom, abonnés, stats)
+- 📋 Lister vos playlists existantes
+- 📝 Optionnellement créer/supprimer une playlist de test
+- 📊 Afficher les infos sur les quotas API
+
+**Avantages:**
+- 🚀 Ultra rapide (pas d'upload)
+- 🔒 Non destructif (aucune vidéo uploadée)
+- 📊 Vérifie que le compte est bien contrôlé
+- 💡 Affiche les limites de quota
+
+---
+
+#### Step 5: Test Upload (Optionnel)
+
+**Si vous voulez tester l'upload complet:**
 
 Create a simple test video first:
 ```bash
@@ -138,11 +164,17 @@ Once you've successfully uploaded a test video:
 ## 📞 Quick Commands Reference
 
 ```bash
+# Verify setup (before authentication)
+python verify_setup.py
+
 # List authenticated accounts
 python youtube_auth.py --list
 
-# Re-authenticate an account
+# Authenticate an account
 python youtube_auth.py --account compte_test_1
+
+# Test account access (LIGHT - recommended first step)
+python test_account_access.py --account compte_test_1
 
 # Upload a video
 python youtube_uploader.py --video PATH --title "TITLE" --account ACCOUNT_ID

@@ -90,6 +90,52 @@ python youtube_auth.py --list
 
 ## 💻 Utilisation
 
+### Test Léger (RECOMMANDÉ - Avant Upload)
+
+**Avant de faire votre premier upload, testez l'accès au compte avec des actions légères:**
+
+```bash
+python test_account_access.py --account compte_test_1
+```
+
+**Ce script va:**
+- ✅ Vérifier que l'authentification fonctionne
+- 📺 Afficher les informations de votre canal (nom, abonnés, statistiques)
+- 📋 Lister vos playlists existantes
+- 📝 Optionnellement créer/supprimer une playlist de test (pour vérifier le contrôle du compte)
+- 📊 Afficher les informations sur les quotas API
+
+**Avantages:**
+- 🚀 **Ultra rapide** - Pas besoin de créer une vidéo de test
+- 🔒 **Non destructif** - Aucune vidéo uploadée, aucune trace publique
+- ✅ **Validation complète** - Vérifie que vous avez bien le contrôle du compte
+- 💡 **Infos utiles** - Affiche vos quotas et limites
+
+**Exemple de sortie:**
+```
+======================================================================
+📺 INFORMATIONS DU CANAL
+======================================================================
+
+✅ Compte authentifié avec succès !
+
+  📌 Nom du canal: Mon Super Canal
+  🆔 Channel ID: UCxxxxxxxxxxxxxxxxx
+  📝 Description: Ma chaîne YouTube...
+
+  📊 Statistiques:
+     • Abonnés: 1234
+     • Vidéos: 10
+     • Vues totales: 50000
+
+  🎬 Fonctionnalités:
+     • Uploads longs: ✅
+     • Shorts: ✅ (disponible pour tous)
+     • Posts communautaires: ✅ (>1234 abonnés)
+```
+
+---
+
 ### Upload d'une vidéo
 
 ```bash

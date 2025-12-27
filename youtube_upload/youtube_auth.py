@@ -133,13 +133,13 @@ class YouTubeAuthenticator:
         if self.disable_ssl_verify:
             # Créer une session HTTP sans vérification SSL
             import httplib2
-            import ssl
+            from google_auth_httplib2 import AuthorizedHttp
 
-            # Créer un contexte SSL qui n'effectue pas de vérification
+            # Créer un httplib2.Http qui ignore SSL
             http = httplib2.Http(disable_ssl_certificate_validation=True)
 
-            # Autoriser les credentials à utiliser ce http
-            authorized_http = credentials.authorize(http)
+            # Créer une session HTTP autorisée
+            authorized_http = AuthorizedHttp(credentials, http=http)
 
             return build('youtube', 'v3', http=authorized_http)
         else:

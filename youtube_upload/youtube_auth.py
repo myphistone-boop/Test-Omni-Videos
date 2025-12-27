@@ -131,10 +131,17 @@ class YouTubeAuthenticator:
 
         # Construire le service YouTube avec SSL désactivé si nécessaire
         if self.disable_ssl_verify:
+            # Créer une session HTTP sans vérification SSL
             import httplib2
-            http = httplib2.Http()
-            http.disable_ssl_certificate_validation = True
-            return build('youtube', 'v3', credentials=credentials, http=http)
+            import ssl
+
+            # Créer un contexte SSL qui n'effectue pas de vérification
+            http = httplib2.Http(disable_ssl_certificate_validation=True)
+
+            # Autoriser les credentials à utiliser ce http
+            authorized_http = credentials.authorize(http)
+
+            return build('youtube', 'v3', http=authorized_http)
         else:
             return build('youtube', 'v3', credentials=credentials)
 

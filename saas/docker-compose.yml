@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DATABASE_URL=postgresql://shorts:password@postgres:5432/shorts_db
+    volumes:
+      - ./backend:/app
+      - ../create_subtitled_video.py:/app/create_subtitled_video.py
+      - ../youtube_downloader.py:/app/youtube_downloader.py
+      - shorts_output:/tmp/shorts_output
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+  # Redis (pour Celery)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # PostgreSQL (Database)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=shorts
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=shorts_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Celery Worker (optionnel - pour production)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A worker worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    volumes:
+      - ./backend:/app
+      - ../create_subtitled_video.py:/app/create_subtitled_video.py
+      - ../youtube_downloader.py:/app/youtube_downloader.py
+      - shorts_output:/tmp/shorts_output
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  shorts_output:

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to Shorts - Convertisseur Automatique</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e1e4e8;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .result {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f6f8fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .download-btn {
+            background: #28a745;
+            margin-top: 10px;
+        }
+
+        .download-btn:hover {
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .error {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            color: #721c24;
+        }
+
+        .success {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e1e4e8;
+        }
+
+        .feature {
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .feature-text {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 YouTube to Shorts</h1>
+        <p class="subtitle">Convertissez n'importe quelle vidéo YouTube en Short viral (9:16 + sous-titres)</p>
+
+        <div class="input-group">
+            <label for="videoUrl">URL YouTube</label>
+            <input
+                type="text"
+                id="videoUrl"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value="">
+        </div>
+
+        <div class="input-group">
+            <label for="language">Langue</label>
+            <select id="language">
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="platform">Plateforme cible</label>
+            <select id="platform">
+                <option value="tiktok">TikTok</option>
+                <option value="youtube_shorts">YouTube Shorts</option>
+                <option value="instagram">Instagram Reels</option>
+            </select>
+        </div>
+
+        <button id="processBtn" onclick="processVideo()">
+            🚀 Générer le Short
+        </button>
+
+        <div class="error" id="error"></div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-text" id="progressText">Initialisation...</p>
+        </div>
+
+        <div class="result" id="result">
+            <p class="success">✅ Short généré avec succès !</p>
+            <button class="download-btn" id="downloadBtn">
+                📥 Télécharger le Short
+            </button>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📐</div>
+                <div class="feature-text">Format 9:16</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💬</div>
+                <div class="feature-text">Sous-titres auto</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-text">Effets viraux</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentJobId = null;
+
+        async function processVideo() {
+            const videoUrl = document.getElementById('videoUrl').value;
+            const language = document.getElementById('language').value;
+            const platform = document.getElementById('platform').value;
+
+            // Validation
+            if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
+                showError('Veuillez entrer une URL YouTube valide');
+                return;
+            }
+
+            // Reset UI
+            hideError();
+            hideResult();
+            showProgress();
+            disableButton();
+
+            try {
+                // Lancer le processing
+                const response = await fetch(`${API_URL}/api/process`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        video_url: videoUrl,
+                        language: language,
+                        target_platform: platform
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur lors de la création du job');
+                }
+
+                const job = await response.json();
+                currentJobId = job.job_id;
+
+                // Polling du status
+                pollStatus();
+
+            } catch (error) {
+                showError('Erreur: ' + error.message);
+                hideProgress();
+                enableButton();
+            }
+        }
+
+        async function pollStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/status/${currentJobId}`);
+                const job = await response.json();
+
+                // Update progress
+                updateProgress(job.progress, job.message);
+
+                if (job.status === 'completed') {
+                    // Succès !
+                    showResult();
+                    hideProgress();
+                    enableButton();
+
+                    // Setup download button
+                    document.getElementById('downloadBtn').onclick = () => {
+                        window.location.href = `${API_URL}/api/download/${currentJobId}`;
+                    };
+
+                } else if (job.status === 'failed') {
+                    // Erreur
+                    showError('Erreur: ' + (job.error || 'Processing échoué'));
+                    hideProgress();
+                    enableButton();
+
+                } else {
+                    // Continue polling
+                    setTimeout(pollStatus, 2000); // Poll toutes les 2 secondes
+                }
+
+            } catch (error) {
+                showError('Erreur lors de la vérification du status');
+                hideProgress();
+                enableButton();
+            }
+        }
+
+        function updateProgress(percent, message) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = message + ' (' + percent + '%)';
+        }
+
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+        }
+
+        function hideProgress() {
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function showResult() {
+            document.getElementById('result').style.display = 'block';
+        }
+
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function disableButton() {
+            const btn = document.getElementById('processBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Processing...';
+        }
+
+        function enableButton() {
+            const btn = document.getElementById('processBtn');
+            btn.disabled = false;
+            btn.textContent = '🚀 Générer le Short';
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('videoUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                processVideo();
+            }
+        });
+    </script>
+</body>
+</html>

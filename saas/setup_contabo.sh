@@ -108,6 +108,9 @@ echo "======================================================================"
 echo "👤 Étape 3/10: Création utilisateur 'shorts'"
 echo "======================================================================"
 
+# Générer mot de passe aléatoire sécurisé
+USER_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+
 # Vérifier si l'utilisateur existe déjà
 if id "shorts" &>/dev/null; then
     log_info "L'utilisateur 'shorts' existe déjà"
@@ -116,13 +119,12 @@ else
     useradd -m -s /bin/bash shorts
 
     # Définir un mot de passe
-    echo "shorts:ShortsPass2024!" | chpasswd
+    echo "shorts:$USER_PASSWORD" | chpasswd
 
     # Ajouter aux sudoers
     usermod -aG sudo shorts
 
-    log_success "Utilisateur 'shorts' créé (password: ShortsPass2024!)"
-    log_info "Changez ce mot de passe après l'installation!"
+    log_success "Utilisateur 'shorts' créé"
 fi
 
 ###############################################################################
@@ -134,12 +136,15 @@ echo "======================================================================"
 echo "🗄️  Étape 4/10: Configuration PostgreSQL"
 echo "======================================================================"
 
+# Générer mot de passe database aléatoire
+DB_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+
 # Démarrer PostgreSQL
 systemctl start postgresql
 systemctl enable postgresql
 
 # Créer database et user
-sudo -u postgres psql -c "CREATE USER shorts WITH PASSWORD 'ShortsDBPass2024!';" 2>/dev/null || log_info "User postgres 'shorts' existe déjà"
+sudo -u postgres psql -c "CREATE USER shorts WITH PASSWORD '$DB_PASSWORD';" 2>/dev/null || log_info "User postgres 'shorts' existe déjà"
 sudo -u postgres psql -c "CREATE DATABASE shorts_db OWNER shorts;" 2>/dev/null || log_info "Database 'shorts_db' existe déjà"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE shorts_db TO shorts;"
 
@@ -233,7 +238,7 @@ cat > /home/shorts/Test-Omni-Videos/saas/backend/.env << EOF
 API_HOST=0.0.0.0
 API_PORT=8000
 OUTPUT_DIR=/home/shorts/videos_output
-DATABASE_URL=postgresql://shorts:ShortsDBPass2024!@localhost/shorts_db
+DATABASE_URL=postgresql://shorts:$DB_PASSWORD@localhost/shorts_db
 REDIS_URL=redis://localhost:6379/0
 EOF
 
@@ -420,6 +425,47 @@ echo "y" | ufw enable
 log_success "Firewall configuré"
 
 ###############################################################################
+# SAUVEGARDER CREDENTIALS
+###############################################################################
+
+echo ""
+echo "======================================================================"
+echo "💾 Sauvegarde des credentials"
+echo "======================================================================"
+
+# Créer fichier de credentials LOCALEMENT sur le serveur
+# Ce fichier NE sera JAMAIS committé sur GitHub
+cat > /root/.shorts_credentials << EOF
+# Credentials YouTube to Shorts SaaS
+# Généré le: $(date)
+# ⚠️  GARDEZ CE FICHIER SECRET - Ne le partagez JAMAIS
+
+## User système
+User: shorts
+Password: $USER_PASSWORD
+
+## PostgreSQL
+DB User: shorts
+DB Password: $DB_PASSWORD
+DB Name: shorts_db
+
+## URLs
+EOF
+
+if [[ $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
+    echo "Public URL: https://$DOMAIN" >> /root/.shorts_credentials
+    echo "API Docs: https://$DOMAIN/docs" >> /root/.shorts_credentials
+else
+    echo "Public URL: http://$PUBLIC_IP" >> /root/.shorts_credentials
+    echo "API Docs: http://$PUBLIC_IP/docs" >> /root/.shorts_credentials
+fi
+
+# Sécuriser le fichier (lisible que par root)
+chmod 600 /root/.shorts_credentials
+
+log_success "Credentials sauvegardés dans /root/.shorts_credentials"
+
+###############################################################################
 # FINALISATION
 ###############################################################################
 
@@ -442,14 +488,9 @@ else
     echo "     http://$PUBLIC_IP/docs (API Documentation)"
 fi
 echo ""
-echo "  🔑 Credentials PostgreSQL:"
-echo "     User: shorts"
-echo "     Pass: ShortsDBPass2024!"
-echo "     DB: shorts_db"
-echo ""
-echo "  👤 User système:"
-echo "     User: shorts"
-echo "     Pass: ShortsPass2024!"
+echo "  🔑 Credentials:"
+echo "     ⚠️  Sauvegardés dans: /root/.shorts_credentials"
+echo "     Voir: cat /root/.shorts_credentials"
 echo ""
 echo "  📁 Chemins importants:"
 echo "     Code: /home/shorts/Test-Omni-Videos"
@@ -460,9 +501,10 @@ echo "  🔧 Commandes utiles:"
 echo "     • Voir logs API: sudo journalctl -u shorts-api -f"
 echo "     • Redémarrer API: sudo systemctl restart shorts-api"
 echo "     • Status services: sudo systemctl status shorts-api"
+echo "     • Voir credentials: cat /root/.shorts_credentials"
 echo ""
 echo "⚠️  ACTION REQUISE:"
-echo "  1. Changez les mots de passe par défaut !"
+echo "  1. Sauvegardez /root/.shorts_credentials en lieu sûr (password manager)"
 echo "  2. Testez l'accès dans votre navigateur"
 if [[ ! $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
     echo "  3. Modifiez saas/frontend/index.html ligne 179:"

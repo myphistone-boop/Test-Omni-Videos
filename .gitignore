@@ -1,5 +1,10 @@
 # Fichiers de configuration sensibles
 .env
+*.env
+.shorts_credentials
+*_credentials
+client_secrets*.json
+credentials/
 
 # Vidéos téléchargées
 videos_telechargees/

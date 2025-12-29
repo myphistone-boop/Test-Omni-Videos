@@ -223,8 +223,8 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
 
-        # Importer et utiliser create_subtitled_video
-        from create_subtitled_video import create_short_video
+        # Importer et utiliser le video processor
+        from video_processor import create_short_video
 
         output_path = OUTPUT_DIR / f"{job_id}.mp4"
 

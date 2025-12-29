@@ -34,8 +34,11 @@ app.add_middleware(
 
 # Base de données simple (à remplacer par PostgreSQL en prod)
 jobs_db = {}
-OUTPUT_DIR = Path("/tmp/shorts_output")
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Output directory - compatible Windows/Linux
+import tempfile
+OUTPUT_DIR = Path(tempfile.gettempdir()) / "shorts_output"
+OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 
 class VideoRequest(BaseModel):
@@ -214,7 +217,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
 
         # Télécharger la vidéo
-        temp_video = f"/tmp/{job_id}_original.mp4"
+        temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
         download_video(video_url, temp_video)
 
         jobs_db[job_id]["progress"] = 50

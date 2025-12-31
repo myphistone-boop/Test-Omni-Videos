@@ -5,13 +5,14 @@ API principale pour accepter URLs et gérer les jobs de processing
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, HttpUrl
 from typing import Optional
 import uuid
 from datetime import datetime
 from pathlib import Path
 import os
+import secrets
 
 # Import worker tasks
 import sys

@@ -210,6 +210,15 @@
             </select>
         </div>
 
+        <div class="input-group">
+            <label for="cookiesFile">🍪 Cookies YouTube (optionnel - recommandé)</label>
+            <input type="file" id="cookiesFile" accept=".txt" style="padding: 8px;">
+            <small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+                📌 Pour éviter les blocages YouTube, uploadez vos cookies.
+                <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color: #667eea;">Installer l'extension</a>
+            </small>
+        </div>
+
         <button id="processBtn" onclick="processVideo()">
             🚀 Générer le Short
         </button>
@@ -254,6 +263,7 @@
             const videoUrl = document.getElementById('videoUrl').value;
             const language = document.getElementById('language').value;
             const platform = document.getElementById('platform').value;
+            const cookiesFile = document.getElementById('cookiesFile').files[0];
 
             // Validation
             if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
@@ -268,17 +278,21 @@
             disableButton();
 
             try {
+                // Préparer les données avec FormData pour supporter le fichier
+                const formData = new FormData();
+                formData.append('video_url', videoUrl);
+                formData.append('language', language);
+                formData.append('target_platform', platform);
+
+                // Ajouter le fichier cookies s'il est fourni
+                if (cookiesFile) {
+                    formData.append('cookies_file', cookiesFile);
+                }
+
                 // Lancer le processing
                 const response = await fetch(`${API_URL}/api/process`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        video_url: videoUrl,
-                        language: language,
-                        target_platform: platform
-                    })
+                    body: formData  // Pas de Content-Type, le navigateur le gère automatiquement
                 });
 
                 if (!response.ok) {

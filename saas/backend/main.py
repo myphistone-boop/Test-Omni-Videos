@@ -3,7 +3,7 @@ FastAPI Backend - YouTube to Shorts SaaS
 API principale pour accepter URLs et gérer les jobs de processing
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
@@ -71,12 +71,21 @@ async def root():
 
 
 @app.post("/api/process", response_model=JobStatus)
-async def process_video(request: VideoRequest, background_tasks: BackgroundTasks):
+async def process_video(
+    background_tasks: BackgroundTasks,
+    video_url: str = Form(...),
+    language: str = Form("fr"),
+    target_platform: str = Form("tiktok"),
+    cookies_file: Optional[UploadFile] = File(None)
+):
     """
     Lance le processing d'une vidéo YouTube
 
     Args:
-        request: URL YouTube + options
+        video_url: URL YouTube
+        language: Langue (fr/en)
+        target_platform: Plateforme cible
+        cookies_file: Fichier cookies.txt (optionnel)
 
     Returns:
         JobStatus avec job_id pour tracking
@@ -85,6 +94,14 @@ async def process_video(request: VideoRequest, background_tasks: BackgroundTasks
     # Créer un job unique
     job_id = str(uuid.uuid4())
 
+    # Sauvegarder les cookies si fournis
+    cookies_path = None
+    if cookies_file:
+        cookies_path = OUTPUT_DIR / f"{job_id}_cookies.txt"
+        with open(cookies_path, "wb") as f:
+            content = await cookies_file.read()
+            f.write(content)
+
     # Initialiser le job
     jobs_db[job_id] = {
         "job_id": job_id,
@@ -92,18 +109,19 @@ async def process_video(request: VideoRequest, background_tasks: BackgroundTasks
         "progress": 0,
         "message": "Job créé, en attente de processing",
         "created_at": datetime.now(),
-        "video_url": str(request.video_url),
-        "language": request.language,
-        "target_platform": request.target_platform
+        "video_url": video_url,
+        "language": language,
+        "target_platform": target_platform,
+        "cookies_path": str(cookies_path) if cookies_path else None
     }
 
-    # Lancer le processing en background (via Celery en prod)
+    # Lancer le processing en background
     background_tasks.add_task(
         process_video_task,
         job_id,
-        str(request.video_url),
-        request.language,
-        request.target_platform
+        video_url,
+        language,
+        target_platform
     )
 
     return JobStatus(**jobs_db[job_id])
@@ -216,9 +234,12 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 30
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
 
+        # Récupérer le chemin des cookies si fourni
+        cookies_path = jobs_db[job_id].get("cookies_path")
+
         # Télécharger la vidéo
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video)
+        download_video(video_url, temp_video, cookies_path=cookies_path)
 
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
@@ -241,9 +262,13 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 90
         jobs_db[job_id]["message"] = "Finalisation..."
 
-        # Nettoyer
+        # Nettoyer les fichiers temporaires
         if os.path.exists(temp_video):
             os.remove(temp_video)
+
+        # Nettoyer le fichier cookies
+        if cookies_path and os.path.exists(cookies_path):
+            os.remove(cookies_path)
 
         # Succès
         jobs_db[job_id]["status"] = "completed"

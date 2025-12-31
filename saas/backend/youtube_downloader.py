@@ -8,20 +8,24 @@ import os
 from pathlib import Path
 
 
-def download_video(url: str, output_path: str):
+def download_video(url: str, output_path: str, cookies_path: str = None):
     """
     Télécharge une vidéo YouTube
 
     Args:
         url: URL de la vidéo YouTube
         output_path: Chemin complet où sauvegarder la vidéo
+        cookies_path: Chemin vers le fichier cookies.txt (optionnel)
 
     Returns:
         str: Chemin du fichier téléchargé
     """
 
-    # Chemin des cookies (optionnel)
-    cookies_file = "/home/shorts/cookies.txt"
+    # Utiliser le cookies_path fourni, sinon fallback sur le global
+    if cookies_path is None:
+        cookies_path = "/home/shorts/cookies.txt"
+
+    cookies_file = cookies_path
 
     # Options yt-dlp
     ydl_opts = {

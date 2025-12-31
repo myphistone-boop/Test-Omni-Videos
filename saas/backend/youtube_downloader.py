@@ -29,8 +29,8 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
 
     # Options yt-dlp
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'merge_output_format': 'mp4',
+        # Format simple qui ne nécessite pas ffmpeg pour merger
+        'format': 'best',
         'outtmpl': output_path,
         'quiet': True,
         'no_warnings': True,

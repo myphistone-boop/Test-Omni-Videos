@@ -11,7 +11,7 @@ from pathlib import Path
 
 def download_with_cobalt(url: str, output_path: str) -> str:
     """
-    Télécharge une vidéo YouTube via Cobalt API (gratuit, pas de cookies requis)
+    Télécharge une vidéo YouTube via Cobalt API v9 (gratuit, pas de cookies requis)
 
     Args:
         url: URL de la vidéo YouTube
@@ -24,16 +24,12 @@ def download_with_cobalt(url: str, output_path: str) -> str:
         Exception: Si Cobalt API échoue
     """
 
-    # Appel à Cobalt API
+    # Appel à Cobalt API v9 (nouvelle version depuis nov 2024)
     response = requests.post(
-        "https://api.cobalt.tools/api/json",
+        "https://api.cobalt.tools/",
         json={
             "url": url,
-            "vCodec": "h264",
-            "vQuality": "1080",
-            "aFormat": "mp3",
-            "filenamePattern": "classic",
-            "isAudioOnly": False
+            "videoQuality": "1080"
         },
         headers={
             "Accept": "application/json",
@@ -47,11 +43,11 @@ def download_with_cobalt(url: str, output_path: str) -> str:
 
     data = response.json()
 
-    # Cobalt peut retourner différents formats
+    # Cobalt v9 retourne un format différent
     if data.get("status") == "error":
         raise Exception(f"Cobalt error: {data.get('text', 'Unknown error')}")
 
-    # Extraire l'URL de la vidéo
+    # Extraire l'URL de la vidéo (format v9)
     video_url = data.get("url")
     if not video_url:
         raise Exception("Cobalt did not return video URL")

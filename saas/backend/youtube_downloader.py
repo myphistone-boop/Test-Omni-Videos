@@ -27,24 +27,24 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
 
     cookies_file = cookies_path
 
-    # Options yt-dlp
+    # Log pour debug
+    print(f"[DEBUG] URL: {url}")
+    print(f"[DEBUG] Cookies: {cookies_file} (exists: {Path(cookies_file).exists()})")
+
+    # Options yt-dlp - Configuration minimale pour maximum compatibilité
     ydl_opts = {
-        # Format simple qui ne nécessite pas ffmpeg pour merger
-        'format': 'best',
         'outtmpl': output_path,
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,  # Verbose pour debug
+        'no_warnings': False,
         'nocheckcertificate': True,
-        # Ajouter les cookies si le fichier existe
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        # Options anti-détection
+        # Ne PAS spécifier de format - laisser yt-dlp choisir le meilleur disponible
         'extractor_args': {
             'youtube': {
                 'player_client': ['android', 'web'],
                 'player_skip': ['webpage', 'configs'],
             }
         },
-        # Headers pour simuler un navigateur
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -53,9 +53,29 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
         }
     }
 
+    print(f"[DEBUG] Starting download...")
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # D'abord extraire les infos pour voir ce qui est disponible
+        try:
+            info = ydl.extract_info(url, download=False)
+            print(f"[DEBUG] Video title: {info.get('title', 'Unknown')}")
+            print(f"[DEBUG] Available formats count: {len(info.get('formats', []))}")
+
+            # Afficher les 5 meilleurs formats
+            if 'formats' in info and info['formats']:
+                print(f"[DEBUG] Top formats available:")
+                for i, fmt in enumerate(info['formats'][:5]):
+                    print(f"  - {fmt.get('format_id')}: {fmt.get('ext')} {fmt.get('resolution', 'audio')} {fmt.get('filesize', 0) / 1024 / 1024:.1f}MB")
+        except Exception as e:
+            print(f"[DEBUG] Error extracting info: {e}")
+            raise
+
+        # Maintenant télécharger
+        print(f"[DEBUG] Downloading...")
         ydl.download([url])
 
+    print(f"[DEBUG] Download complete: {output_path}")
     return output_path
 
 

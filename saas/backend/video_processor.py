@@ -4,6 +4,7 @@ Transforme des vidéos en shorts avec sous-titres
 """
 
 import sys
+import shutil
 from pathlib import Path
 
 # Ajouter le parent au path pour importer create_subtitled_video
@@ -28,12 +29,17 @@ def create_short_video(input_video: str, output_path: str, language: str = "fr")
     # Créer le générateur
     generator = YouTubeSubtitleGenerator()
 
-    # Traiter la vidéo (elle utilise déjà le fichier local)
-    # La méthode traiter_video accepte un fichier local
-    generator.traiter_video(
+    # Traiter la vidéo (démarre à l'étape 2 car on a déjà la vidéo)
+    # traiter_video retourne le chemin du fichier généré
+    generated_video = generator.traiter_video(
         video_path=input_video,
-        output_path=output_path,
-        language=language
+        etape_depart=2  # Démarrer à l'extraction audio (vidéo déjà téléchargée)
     )
 
-    return output_path
+    # Copier le fichier généré vers le chemin de sortie souhaité
+    if generated_video and Path(generated_video).exists():
+        shutil.copy2(generated_video, output_path)
+        print(f"✅ Vidéo copiée vers: {output_path}")
+        return output_path
+    else:
+        raise Exception(f"Échec de la génération de la vidéo. Fichier non trouvé: {generated_video}")

@@ -29,11 +29,26 @@ def create_short_video(input_video: str, output_path: str, language: str = "fr")
     # Créer le générateur
     generator = YouTubeSubtitleGenerator()
 
-    # Traiter la vidéo (démarre à l'étape 2 car on a déjà la vidéo)
-    # traiter_video retourne le chemin du fichier généré
-    generated_video = generator.traiter_video(
+    video_title = Path(input_video).stem
+
+    print("\n" + "=" * 70)
+    print("🎥 GÉNÉRATEUR DE SOUS-TITRES - MODE AUTOMATIQUE")
+    print("=" * 70)
+
+    # Étape 1: Extraire l'audio
+    print("\n🎵 Extraction de l'audio...")
+    audio_path = generator.extraire_audio(input_video, video_title)
+
+    # Étape 2: Transcrire avec Whisper
+    print("\n🎙️ Transcription avec Whisper...")
+    transcript = generator.transcrire_audio(audio_path, video_title, language=language)
+
+    # Étape 3: Créer le short TikTok optimisé
+    print("\n🎬 Création du short TikTok optimisé...")
+    generated_video = generator.creer_video_tiktok_optimisee(
         video_path=input_video,
-        etape_depart=2  # Démarrer à l'extraction audio (vidéo déjà téléchargée)
+        transcript=transcript,
+        video_title=video_title
     )
 
     # Copier le fichier généré vers le chemin de sortie souhaité

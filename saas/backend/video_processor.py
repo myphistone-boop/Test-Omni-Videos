@@ -41,7 +41,7 @@ def create_short_video(input_video: str, output_path: str, language: str = "fr")
 
     # Étape 2: Transcrire avec Whisper
     print("\n🎙️ Transcription avec Whisper...")
-    transcript = generator.transcrire_audio(audio_path, video_title, language=language)
+    transcript = generator.transcrire_avec_whisper(audio_path, video_title)
 
     # Étape 3: Créer le short TikTok optimisé
     print("\n🎬 Création du short TikTok optimisé...")

@@ -31,26 +31,20 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
     print(f"[DEBUG] URL: {url}")
     print(f"[DEBUG] Cookies: {cookies_file} (exists: {Path(cookies_file).exists()})")
 
-    # Options yt-dlp - Configuration minimale pour maximum compatibilité
+    # Options yt-dlp - Forcer client Android pour éviter les challenges JavaScript
     ydl_opts = {
         'outtmpl': output_path,
         'quiet': False,  # Verbose pour debug
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        # Ne PAS spécifier de format - laisser yt-dlp choisir le meilleur disponible
+        # FORCER uniquement le client Android (pas de JavaScript runtime requis)
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
-                'player_skip': ['webpage', 'configs'],
+                'player_client': ['android'],  # UNIQUEMENT Android
+                'player_skip': ['webpage', 'js'],  # Skip webpage et JavaScript
             }
         },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
-            'Sec-Fetch-Mode': 'navigate',
-        }
     }
 
     print(f"[DEBUG] Starting download...")

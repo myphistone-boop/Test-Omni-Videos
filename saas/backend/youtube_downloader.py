@@ -31,20 +31,15 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
     print(f"[DEBUG] URL: {url}")
     print(f"[DEBUG] Cookies: {cookies_file} (exists: {Path(cookies_file).exists()})")
 
-    # Options yt-dlp - Client web avec cookies (nécessite Node.js installé)
+    # Options yt-dlp - Laisser choisir automatiquement le meilleur client
     ydl_opts = {
         'outtmpl': output_path,
         'quiet': False,  # Verbose pour debug
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        # Client web: SEUL client supportant les cookies
-        # Nécessite Node.js pour résoudre le n-challenge
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web'],
-            }
-        },
+        # Ne pas spécifier de client - laisser yt-dlp choisir automatiquement
+        # avec les cookies fournis
     }
 
     print(f"[DEBUG] Starting download...")

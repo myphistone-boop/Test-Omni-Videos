@@ -78,28 +78,25 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     print(f"\n✂️  Extraction du segment ({int(fin_segment - debut_segment)}s)...")
     segment_path = str(Path(tempfile.gettempdir()) / f"{video_title}_segment.mp4")
 
-    # Utiliser FFmpeg pour extraire le segment (rapide, pas de réencodage)
+    # Utiliser FFmpeg pour extraire le segment avec réencodage
+    # -ss AVANT -i = seek plus rapide, réencoder évite le freeze au début
     extract_cmd = [
-        'ffmpeg', '-i', input_video,
-        '-ss', str(debut_segment),
+        'ffmpeg',
+        '-ss', str(debut_segment),  # -ss AVANT -i = plus rapide
+        '-i', input_video,
         '-t', str(fin_segment - debut_segment),
-        '-c', 'copy',  # Copy sans réencoder = ULTRA RAPIDE
+        '-c:v', 'libx264',  # Réencoder pour éviter freeze
+        '-preset', 'ultrafast',
+        '-c:a', 'aac',
+        '-b:a', '128k',
         '-y',
         segment_path
     ]
 
     result = subprocess.run(extract_cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"⚠️  Extraction rapide échouée, utilisation de méthode classique...")
-        # Fallback : extraire avec réencodage
-        extract_cmd = [
-            'ffmpeg', '-i', input_video,
-            '-ss', str(debut_segment),
-            '-t', str(fin_segment - debut_segment),
-            '-y',
-            segment_path
-        ]
-        result = subprocess.run(extract_cmd, capture_output=True, text=True)
+        print(f"❌ Erreur extraction : {result.stderr}")
+        raise Exception(f"Échec extraction segment: {result.stderr}")
 
     # Étape 5: Filtrer la transcription pour ce segment uniquement
     print("\n📝 Génération des sous-titres (segment uniquement)...")

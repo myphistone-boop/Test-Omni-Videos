@@ -103,16 +103,26 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
     # Étape 5: Filtrer la transcription pour ce segment uniquement
     print("\n📝 Génération des sous-titres (segment uniquement)...")
-    mots_filtres = []
+
+    # Convertir transcript.words en format dict
+    tous_mots = []
     for mot in transcript.words:
-        if debut_segment <= mot.start <= fin_segment:
+        tous_mots.append({
+            'word': mot.word,
+            'start': mot.start,
+            'end': mot.end
+        })
+
+    # Filtrer pour le segment
+    mots_filtres = []
+    for mot_dict in tous_mots:
+        if debut_segment <= mot_dict['start'] <= fin_segment:
             # Ajuster les timestamps relatifs au segment
-            mot_copie = type(mot)(
-                word=mot.word,
-                start=mot.start - debut_segment,
-                end=mot.end - debut_segment
-            )
-            mots_filtres.append(mot_copie)
+            mots_filtres.append({
+                'word': mot_dict['word'],
+                'start': mot_dict['start'] - debut_segment,
+                'end': mot_dict['end'] - debut_segment
+            })
 
     # Créer le fichier .ass avec les mots filtrés
     ass_path = Path(tempfile.gettempdir()) / f"{video_title}_subtitles.ass"

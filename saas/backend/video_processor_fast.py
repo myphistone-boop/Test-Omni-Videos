@@ -19,10 +19,11 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     """
     Crée un short RAPIDEMENT avec pipeline optimisé
 
-    Pipeline :
+    Pipeline ULTRA-RAPIDE :
     1. Extraction audio + Transcription Whisper
-    2. Génération fichier .ass sous-titres
-    3. UNE SEULE PASSE FFmpeg : vertical 9:16 + flou + sous-titres
+    2. EXTRACTION des 60-90s les plus virales (au lieu de traiter 5 min!)
+    3. Génération fichier .ass sous-titres (sur 60s seulement)
+    4. UNE SEULE PASSE FFmpeg sur 60s : vertical 9:16 + flou + sous-titres
 
     Args:
         input_video: Chemin vers la vidéo source
@@ -37,7 +38,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     video_title = Path(input_video).stem
 
     print("\n" + "=" * 70)
-    print("⚡ GÉNÉRATEUR RAPIDE - PIPELINE OPTIMISÉ")
+    print("⚡ GÉNÉRATEUR ULTRA-RAPIDE - EXTRACTION 60s VIRALES")
     print("=" * 70)
 
     # Étape 1: Extraire l'audio
@@ -48,21 +49,82 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     print("\n🎙️ Transcription avec Whisper...")
     transcript = generator.transcrire_avec_whisper(audio_path, video_title)
 
-    # Étape 3: Générer le fichier ASS de sous-titres
-    print("\n📝 Génération des sous-titres ASS...")
-    _, mots_timestamps = generator.creer_fonction_sous_titres(transcript)
+    # Étape 3: NOUVEAUTÉ - Détecter et extraire segment viral (60-90s)
+    print("\n🔥 Détection du segment viral optimal (60-90s)...")
+    moments_forts = generator.detecter_moments_forts_local(transcript, duree_segment=3)
 
-    # Créer le fichier .ass
-    ass_path = Path(tempfile.gettempdir()) / f"{video_title}_subtitles.ass"
-    generator.creer_fichier_ass_anime(mots_timestamps, str(ass_path))
+    # Déterminer le meilleur segment de 60-90s
+    from moviepy.editor import VideoFileClip
+    video = VideoFileClip(input_video)
+    duree_totale = video.duration
+    video.close()
 
-    # Étape 4: UNE SEULE PASSE FFmpeg - tout en un !
-    print("\n⚡ Conversion 9:16 + Flou + Sous-titres (FFmpeg ultrafast)...")
-    print("   💡 Pipeline optimisé : 1 seul encodage au lieu de 6 !")
+    duree_souhaitee = min(60, duree_totale)  # Max 60 secondes
 
-    # Commande FFmpeg optimisée qui fait TOUT en une passe
-    ffmpeg_cmd = [
+    if moments_forts and duree_totale > duree_souhaitee:
+        # Prendre le moment fort avec le meilleur score
+        meilleur_moment = moments_forts[0]
+        debut_segment = max(0, meilleur_moment['start'] - 5)  # 5s avant le moment fort
+        fin_segment = min(debut_segment + duree_souhaitee, duree_totale)
+        print(f"   ✨ Segment viral trouvé : {int(debut_segment)}s → {int(fin_segment)}s")
+        print(f"   💡 Raison : {meilleur_moment.get('reason', 'N/A')}")
+    else:
+        # Prendre le début si pas de moment fort ou vidéo courte
+        debut_segment = 0
+        fin_segment = min(duree_souhaitee, duree_totale)
+        print(f"   📍 Utilisation du début : 0s → {int(fin_segment)}s")
+
+    # Étape 4: Extraire le segment viral AVANT traitement
+    print(f"\n✂️  Extraction du segment ({int(fin_segment - debut_segment)}s)...")
+    segment_path = str(Path(tempfile.gettempdir()) / f"{video_title}_segment.mp4")
+
+    # Utiliser FFmpeg pour extraire le segment (rapide, pas de réencodage)
+    extract_cmd = [
         'ffmpeg', '-i', input_video,
+        '-ss', str(debut_segment),
+        '-t', str(fin_segment - debut_segment),
+        '-c', 'copy',  # Copy sans réencoder = ULTRA RAPIDE
+        '-y',
+        segment_path
+    ]
+
+    result = subprocess.run(extract_cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"⚠️  Extraction rapide échouée, utilisation de méthode classique...")
+        # Fallback : extraire avec réencodage
+        extract_cmd = [
+            'ffmpeg', '-i', input_video,
+            '-ss', str(debut_segment),
+            '-t', str(fin_segment - debut_segment),
+            '-y',
+            segment_path
+        ]
+        result = subprocess.run(extract_cmd, capture_output=True, text=True)
+
+    # Étape 5: Filtrer la transcription pour ce segment uniquement
+    print("\n📝 Génération des sous-titres (segment uniquement)...")
+    mots_filtres = []
+    for mot in transcript.words:
+        if debut_segment <= mot.start <= fin_segment:
+            # Ajuster les timestamps relatifs au segment
+            mot_copie = type(mot)(
+                word=mot.word,
+                start=mot.start - debut_segment,
+                end=mot.end - debut_segment
+            )
+            mots_filtres.append(mot_copie)
+
+    # Créer le fichier .ass avec les mots filtrés
+    ass_path = Path(tempfile.gettempdir()) / f"{video_title}_subtitles.ass"
+    generator.creer_fichier_ass_anime(mots_filtres, str(ass_path))
+
+    # Étape 6: UNE SEULE PASSE FFmpeg sur le segment court !
+    print(f"\n⚡ Conversion 9:16 + Flou + Sous-titres (sur {int(fin_segment - debut_segment)}s)...")
+    print("   💡 Traitement d'un segment court = 5-10x plus rapide !")
+
+    # Commande FFmpeg optimisée sur le SEGMENT uniquement
+    ffmpeg_cmd = [
+        'ffmpeg', '-i', segment_path,
         '-filter_complex',
         # Split en 2 streams: background flouté + vidéo principale
         '[0:v]split=2[bg][fg];'
@@ -90,11 +152,14 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         print(f"❌ Erreur FFmpeg: {result.stderr}")
         raise Exception(f"Échec FFmpeg: {result.stderr}")
 
-    # Nettoyer le fichier ASS temporaire
+    # Nettoyer les fichiers temporaires
     if ass_path.exists():
         ass_path.unlink()
+    if Path(segment_path).exists():
+        Path(segment_path).unlink()
 
     print(f"✅ Short créé avec succès : {output_path}")
-    print(f"   ⏱️  Gain de temps : ~80% plus rapide que l'ancien pipeline !")
+    print(f"   ⏱️  Gain de temps : 5-10x plus rapide que traiter toute la vidéo !")
+    print(f"   📏 Durée finale : {int(fin_segment - debut_segment)}s (optimisé pour TikTok/Shorts)")
 
     return output_path

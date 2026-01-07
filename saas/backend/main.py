@@ -245,16 +245,16 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
 
-        # Importer et utiliser le video processor
-        from video_processor import create_short_video
+        # Importer le video processor RAPIDE (pipeline optimisé)
+        from video_processor_fast import create_short_video_fast
 
         output_path = OUTPUT_DIR / f"{job_id}.mp4"
 
         jobs_db[job_id]["progress"] = 70
-        jobs_db[job_id]["message"] = "Création du short (9:16 + effets)..."
+        jobs_db[job_id]["message"] = "Création du short optimisé (1 passe FFmpeg)..."
 
-        # Créer le short
-        create_short_video(
+        # Créer le short avec pipeline rapide
+        create_short_video_fast(
             input_video=temp_video,
             output_path=str(output_path),
             language=language

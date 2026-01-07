@@ -168,11 +168,19 @@ After=network.target
 User=shorts
 WorkingDirectory=/home/shorts/saas/backend
 Environment="PATH=/home/shorts/saas/venv/bin"
-ExecStart=/home/shorts/saas/venv/bin/gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+ExecStart=/home/shorts/saas/venv/bin/gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+> ⚠️ **Important**: Utilisez `-w 1` (1 worker) car l'application utilise un stockage en mémoire pour les jobs.
+> Avec plusieurs workers, les jobs créés par un worker ne sont pas accessibles aux autres workers.
+>
+> **Solutions pour multi-workers:**
+> - Implémenter Redis pour partager l'état entre workers
+> - Ou utiliser PostgreSQL pour stocker les jobs
+> - Pour un MVP, 1 worker est suffisant pour ~10-20 utilisateurs simultanés
 
 ```bash
 # Enable & start

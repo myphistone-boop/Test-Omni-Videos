@@ -5,6 +5,7 @@ Télécharge des vidéos YouTube via yt-dlp avec cookies utilisateur
 
 import yt_dlp
 import os
+import json
 from pathlib import Path
 
 
@@ -98,3 +99,132 @@ def download_video(url: str, output_path: str, cookies_path: str = None):
 
     # Télécharger avec cookies
     return download_with_ytdlp(url, output_path, cookies_path)
+
+
+def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str = None):
+    """
+    Télécharge les sous-titres YouTube (auto-générés ou manuels)
+
+    Args:
+        url: URL YouTube
+        language: Code langue (fr, en, etc.)
+        cookies_path: Chemin cookies (optionnel)
+
+    Returns:
+        list[dict]: Liste de mots avec timestamps au format Whisper
+                    [{'word': 'bonjour', 'start': 0.5, 'end': 1.2}, ...]
+        None: Si pas de sous-titres disponibles
+    """
+
+    print(f"🎬 Tentative de récupération des sous-titres YouTube...")
+
+    cookies_file = cookies_path if cookies_path and Path(cookies_path).exists() else None
+
+    ydl_opts = {
+        'skip_download': True,  # Ne pas télécharger la vidéo
+        'writesubtitles': True,  # Sous-titres manuels
+        'writeautomaticsub': True,  # Sous-titres auto-générés
+        'subtitleslangs': [language, 'en'],  # Langues préférées
+        'subtitlesformat': 'json3',  # Format JSON avec timestamps précis
+        'quiet': True,
+        'no_warnings': True,
+        'cookiefile': cookies_file,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            # Vérifier si des sous-titres sont disponibles
+            subtitles = info.get('subtitles', {})
+            automatic_captions = info.get('automatic_captions', {})
+
+            # Priorité: sous-titres manuels > sous-titres auto
+            all_subs = {**automatic_captions, **subtitles}
+
+            if not all_subs:
+                print("❌ Aucun sous-titre disponible")
+                return None
+
+            # Chercher dans l'ordre: langue demandée, puis anglais
+            for lang in [language, 'en']:
+                if lang in all_subs:
+                    print(f"✅ Sous-titres trouvés en '{lang}'")
+
+                    # Récupérer les sous-titres au format json3
+                    for sub_format in all_subs[lang]:
+                        if sub_format.get('ext') == 'json3':
+                            # Télécharger le fichier JSON
+                            sub_url = sub_format['url']
+
+                            # Utiliser yt-dlp pour télécharger le contenu
+                            import urllib.request
+                            with urllib.request.urlopen(sub_url) as response:
+                                sub_data = json.loads(response.read().decode('utf-8'))
+
+                            # Parser au format Whisper
+                            words = parse_youtube_subtitles_to_whisper(sub_data)
+                            print(f"✅ {len(words)} mots extraits des sous-titres YouTube")
+                            return words
+
+            print("❌ Format json3 non disponible")
+            return None
+
+    except Exception as e:
+        print(f"❌ Erreur lors de la récupération des sous-titres: {e}")
+        return None
+
+
+def parse_youtube_subtitles_to_whisper(sub_data):
+    """
+    Parse les sous-titres YouTube JSON3 au format Whisper
+
+    Args:
+        sub_data: Données JSON3 des sous-titres YouTube
+
+    Returns:
+        list[dict]: Format Whisper [{'word': 'mot', 'start': 0.5, 'end': 1.2}]
+    """
+
+    words = []
+
+    # JSON3 contient 'events' avec timing mot par mot
+    events = sub_data.get('events', [])
+
+    for event in events:
+        # Vérifier si l'event a des segments (mots)
+        if 'segs' not in event:
+            continue
+
+        start_time = event.get('tStartMs', 0) / 1000.0  # Convertir ms en secondes
+
+        for seg in event['segs']:
+            # Certains segments sont juste des espaces/ponctuation
+            if 'utf8' not in seg:
+                continue
+
+            text = seg['utf8'].strip()
+            if not text or text in ['\n', ' ']:
+                continue
+
+            # Durée du segment (si disponible, sinon estimer)
+            offset_ms = seg.get('tOffsetMs', 0)
+            offset_sec = offset_ms / 1000.0
+
+            word_start = start_time + offset_sec
+
+            # Estimer la fin (YouTube ne donne pas toujours la durée exacte)
+            # On utilise le début du mot suivant ou +0.3s par défaut
+            word_end = word_start + 0.3
+
+            words.append({
+                'word': text,
+                'start': word_start,
+                'end': word_end
+            })
+
+    # Ajuster les 'end' en fonction du 'start' suivant
+    for i in range(len(words) - 1):
+        words[i]['end'] = min(words[i]['end'], words[i + 1]['start'])
+
+    return words

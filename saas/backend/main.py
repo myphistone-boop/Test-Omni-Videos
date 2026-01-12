@@ -77,6 +77,7 @@ async def process_video(
     video_url: str = Form(...),
     language: str = Form("fr"),
     target_platform: str = Form("tiktok"),
+    transcription_mode: str = Form("youtube_subs"),  # 'youtube_subs' ou 'whisper'
     cookies_file: Optional[UploadFile] = File(None)
 ):
     """
@@ -86,6 +87,7 @@ async def process_video(
         video_url: URL YouTube
         language: Langue (fr/en)
         target_platform: Plateforme cible
+        transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
         cookies_file: Fichier cookies.txt (optionnel)
 
     Returns:
@@ -113,6 +115,7 @@ async def process_video(
         "video_url": video_url,
         "language": language,
         "target_platform": target_platform,
+        "transcription_mode": transcription_mode,
         "cookies_path": str(cookies_path) if cookies_path else None
     }
 
@@ -122,7 +125,8 @@ async def process_video(
         job_id,
         video_url,
         language,
-        target_platform
+        target_platform,
+        transcription_mode
     )
 
     return JobStatus(**jobs_db[job_id])
@@ -215,12 +219,19 @@ async def list_jobs():
 # WORKER FUNCTION (à déplacer vers Celery)
 # ==========================================
 
-def process_video_task(job_id: str, video_url: str, language: str, target_platform: str):
+def process_video_task(job_id: str, video_url: str, language: str, target_platform: str, transcription_mode: str = "youtube_subs"):
     """
     Traite une vidéo YouTube en short
 
     Cette fonction sera remplacée par une tâche Celery en production
     Pour l'instant elle tourne en background task FastAPI
+
+    Args:
+        job_id: ID du job
+        video_url: URL YouTube
+        language: Langue (fr/en)
+        target_platform: Plateforme cible
+        transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
     """
 
     try:
@@ -261,7 +272,9 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             input_video=temp_video,
             output_path=str(output_path),
             language=language,
-            progress_callback=update_progress
+            progress_callback=update_progress,
+            youtube_url=video_url,
+            transcription_mode=transcription_mode
         )
 
         # Nettoyer les fichiers temporaires

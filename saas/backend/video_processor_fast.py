@@ -17,21 +17,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from create_subtitled_video import YouTubeSubtitleGenerator
 
 
-def create_short_video_fast(input_video: str, output_path: str, language: str = "fr", progress_callback=None):
+def create_short_video_fast(input_video: str, output_path: str, language: str = "fr",
+                           progress_callback=None, youtube_url: str = None,
+                           transcription_mode: str = "youtube_subs"):
     """
     Crée un short RAPIDEMENT avec pipeline optimisé
 
     Pipeline ULTRA-RAPIDE :
-    1. Extraction audio + Transcription Whisper
-    2. EXTRACTION des 60-90s les plus virales (au lieu de traiter 5 min!)
+    1. Transcription (YouTube subs OU Whisper)
+    2. EXTRACTION des 60-90s les plus virales
     3. Génération fichier .ass sous-titres (sur 60s seulement)
-    4. UNE SEULE PASSE FFmpeg sur 60s : vertical 9:16 + flou + sous-titres
+    4. UNE SEULE PASSE FFmpeg sur 60s : vertical 720p + fond noir + sous-titres
 
     Args:
         input_video: Chemin vers la vidéo source
         output_path: Chemin où sauvegarder le short
         language: Langue des sous-titres (fr ou en)
         progress_callback: Fonction optionnelle callback(progress, message)
+        youtube_url: URL YouTube (requis si transcription_mode='youtube_subs')
+        transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
 
     Returns:
         str: Chemin du fichier créé
@@ -41,20 +45,72 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     video_title = Path(input_video).stem
 
     print("\n" + "=" * 70)
-    print("⚡ GÉNÉRATEUR ULTRA-RAPIDE - EXTRACTION 60s VIRALES")
+    print(f"⚡ GÉNÉRATEUR ULTRA-RAPIDE - MODE: {transcription_mode.upper()}")
     print("=" * 70)
 
-    # Étape 1: Extraire l'audio
-    print("\n🎵 Extraction de l'audio...")
-    audio_path = generator.extraire_audio(input_video, video_title)
+    # Étape 1 & 2: Obtenir la transcription
+    transcript_words = None
 
-    # Étape 2: Transcrire avec Whisper
-    print("\n🎙️ Transcription avec Whisper...")
-    transcript = generator.transcrire_avec_whisper(audio_path, video_title)
+    if transcription_mode == "youtube_subs" and youtube_url:
+        # MODE 1: Sous-titres YouTube (GRATUIT, ULTRA-RAPIDE)
+        print("\n🎬 Récupération des sous-titres YouTube...")
+        if progress_callback:
+            progress_callback(35, "Récupération des sous-titres YouTube...")
+
+        from youtube_downloader import download_youtube_subtitles
+        transcript_words = download_youtube_subtitles(youtube_url, language)
+
+        if transcript_words:
+            print(f"✅ {len(transcript_words)} mots récupérés des sous-titres YouTube (gratuit!)")
+        else:
+            print("⚠️ Pas de sous-titres YouTube, fallback vers Whisper...")
+            transcription_mode = "whisper"  # Fallback
+
+    if transcription_mode == "whisper" or transcript_words is None:
+        # MODE 2: Whisper API (PAYANT mais FIABLE)
+        print("\n🎵 Extraction de l'audio...")
+        if progress_callback:
+            progress_callback(35, "Extraction audio...")
+
+        audio_path = generator.extraire_audio(input_video, video_title)
+
+        print("\n🎙️ Transcription avec Whisper API...")
+        if progress_callback:
+            progress_callback(40, "Transcription Whisper (peut prendre 1-4 min selon la durée)...")
+
+        transcript = generator.transcrire_avec_whisper(audio_path, video_title)
+
+        # Convertir au format unifié
+        transcript_words = []
+        for mot in transcript.words:
+            transcript_words.append({
+                'word': mot.word,
+                'start': mot.start,
+                'end': mot.end
+            })
+
+    if not transcript_words:
+        raise Exception("Impossible d'obtenir la transcription")
+
+    # Créer un objet mock transcript avec attribut 'words' pour la détection virale
+    class MockWord:
+        def __init__(self, word, start, end):
+            self.word = word
+            self.start = start
+            self.end = end
+
+    class MockTranscript:
+        def __init__(self, words_list):
+            self.words = [MockWord(w['word'], w['start'], w['end']) for w in words_list]
+
+    mock_transcript = MockTranscript(transcript_words)
 
     # Étape 3: NOUVEAUTÉ - Détecter et extraire segment viral (60-90s)
     print("\n🔥 Détection du segment viral optimal (60-90s)...")
-    moments_forts = generator.detecter_moments_forts_local(transcript, duree_segment=3)
+    if progress_callback:
+        progress_callback(50, "Analyse des moments viraux...")
+
+    moments_forts = generator.detecter_moments_forts_local(mock_transcript, duree_segment=3)
 
     # Déterminer le meilleur segment de 60-90s
     from moviepy.editor import VideoFileClip
@@ -110,18 +166,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     # Étape 5: Filtrer la transcription pour ce segment uniquement
     print("\n📝 Génération des sous-titres (segment uniquement)...")
 
-    # Convertir transcript.words en format dict
-    tous_mots = []
-    for mot in transcript.words:
-        tous_mots.append({
-            'word': mot.word,
-            'start': mot.start,
-            'end': mot.end
-        })
-
-    # Filtrer pour le segment
+    # Filtrer les mots pour le segment viral sélectionné
     mots_filtres = []
-    for mot_dict in tous_mots:
+    for mot_dict in transcript_words:
         if debut_segment <= mot_dict['start'] <= fin_segment:
             # Ajuster les timestamps relatifs au segment
             mots_filtres.append({

@@ -135,29 +135,27 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     generator.creer_fichier_ass_anime(mots_filtres, str(ass_path))
 
     # Étape 6: UNE SEULE PASSE FFmpeg sur le segment court !
-    print(f"\n⚡ Conversion 9:16 + Flou + Sous-titres (sur {int(fin_segment - debut_segment)}s)...")
-    print("   💡 Traitement d'un segment court = 5-10x plus rapide !")
+    print(f"\n⚡ Conversion 720p + Fond Noir + Sous-titres (sur {int(fin_segment - debut_segment)}s)...")
+    print("   💡 Optimisations : 720p + fond noir = 2-3x plus rapide que 1080p + blur !")
 
     if progress_callback:
         progress_callback(70, "Création du short optimisé (traitement vidéo)...")
 
-    # Commande FFmpeg optimisée sur le SEGMENT uniquement
+    # Commande FFmpeg ULTRA-OPTIMISÉE
     ffmpeg_cmd = [
         'ffmpeg', '-i', segment_path,
         '-filter_complex',
-        # Split en 2 streams: background flouté + vidéo principale
-        '[0:v]split=2[bg][fg];'
-        # Background: scale + blur
-        '[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=20[bg_blur];'
-        # Foreground: scale pour garder aspect ratio dans 9:16
-        '[fg]scale=1080:-2[fg_scaled];'
-        # Overlay foreground sur background flouté (centré)
-        '[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2,subtitles=' + str(ass_path) + '[out]',
+        # Fond noir 720x1280 (RAPIDE, pas de blur gourmand!)
+        'color=black:s=720x1280[bg];'
+        # Vidéo principale scalée en 720p
+        '[0:v]scale=720:-2[fg];'
+        # Overlay vidéo au centre + sous-titres
+        '[bg][fg]overlay=(W-w)/2:(H-h)/2,subtitles=' + str(ass_path) + '[out]',
         '-map', '[out]',
         '-map', '0:a?',  # Copier l'audio si présent
         '-c:v', 'libx264',
         '-preset', 'ultrafast',  # ULTRA RAPIDE
-        '-crf', '23',  # Qualité correcte
+        '-crf', '28',  # Qualité optimisée pour TikTok/Shorts
         '-c:a', 'aac',
         '-b:a', '128k',
         '-y',  # Overwrite

@@ -250,18 +250,19 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
 
         output_path = OUTPUT_DIR / f"{job_id}.mp4"
 
-        jobs_db[job_id]["progress"] = 70
-        jobs_db[job_id]["message"] = "Création du short optimisé (1 passe FFmpeg)..."
+        # Créer une fonction callback pour les mises à jour de progression
+        def update_progress(progress: int, message: str):
+            """Callback pour mettre à jour la progression en temps réel"""
+            jobs_db[job_id]["progress"] = progress
+            jobs_db[job_id]["message"] = message
 
         # Créer le short avec pipeline rapide
         create_short_video_fast(
             input_video=temp_video,
             output_path=str(output_path),
-            language=language
+            language=language,
+            progress_callback=update_progress
         )
-
-        jobs_db[job_id]["progress"] = 90
-        jobs_db[job_id]["message"] = "Finalisation..."
 
         # Nettoyer les fichiers temporaires
         if os.path.exists(temp_video):

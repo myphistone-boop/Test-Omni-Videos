@@ -7,6 +7,8 @@ import sys
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 # Ajouter le parent au path pour importer create_subtitled_video
@@ -15,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from create_subtitled_video import YouTubeSubtitleGenerator
 
 
-def create_short_video_fast(input_video: str, output_path: str, language: str = "fr"):
+def create_short_video_fast(input_video: str, output_path: str, language: str = "fr", progress_callback=None):
     """
     Crée un short RAPIDEMENT avec pipeline optimisé
 
@@ -29,6 +31,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         input_video: Chemin vers la vidéo source
         output_path: Chemin où sauvegarder le short
         language: Langue des sous-titres (fr ou en)
+        progress_callback: Fonction optionnelle callback(progress, message)
 
     Returns:
         str: Chemin du fichier créé
@@ -76,6 +79,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
     # Étape 4: Extraire le segment viral AVANT traitement
     print(f"\n✂️  Extraction du segment ({int(fin_segment - debut_segment)}s)...")
+    if progress_callback:
+        progress_callback(55, "Extraction du segment viral...")
+
     segment_path = str(Path(tempfile.gettempdir()) / f"{video_title}_segment.mp4")
 
     # Utiliser FFmpeg pour extraire le segment avec réencodage
@@ -97,6 +103,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     if result.returncode != 0:
         print(f"❌ Erreur extraction : {result.stderr}")
         raise Exception(f"Échec extraction segment: {result.stderr}")
+
+    if progress_callback:
+        progress_callback(65, "Segment extrait, préparation des sous-titres...")
 
     # Étape 5: Filtrer la transcription pour ce segment uniquement
     print("\n📝 Génération des sous-titres (segment uniquement)...")
@@ -129,6 +138,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     print(f"\n⚡ Conversion 9:16 + Flou + Sous-titres (sur {int(fin_segment - debut_segment)}s)...")
     print("   💡 Traitement d'un segment court = 5-10x plus rapide !")
 
+    if progress_callback:
+        progress_callback(70, "Création du short optimisé (traitement vidéo)...")
+
     # Commande FFmpeg optimisée sur le SEGMENT uniquement
     ffmpeg_cmd = [
         'ffmpeg', '-i', segment_path,
@@ -153,11 +165,36 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     ]
 
     print(f"   🚀 Lancement FFmpeg...")
+
+    # Flag pour savoir quand FFmpeg est terminé
+    ffmpeg_done = threading.Event()
+
+    def simulate_progress():
+        """Simule la progression pendant l'encodage FFmpeg"""
+        current_progress = 70
+        while not ffmpeg_done.is_set() and current_progress < 88:
+            time.sleep(2)  # Toutes les 2 secondes
+            if not ffmpeg_done.is_set():
+                current_progress += 1
+                if progress_callback:
+                    progress_callback(current_progress, f"Traitement vidéo en cours ({current_progress}%)...")
+
+    # Lancer le thread de progression si callback fourni
+    if progress_callback:
+        progress_thread = threading.Thread(target=simulate_progress, daemon=True)
+        progress_thread.start()
+
     result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+
+    # Arrêter la simulation de progression
+    ffmpeg_done.set()
 
     if result.returncode != 0:
         print(f"❌ Erreur FFmpeg: {result.stderr}")
         raise Exception(f"Échec FFmpeg: {result.stderr}")
+
+    if progress_callback:
+        progress_callback(90, "Finalisation du short...")
 
     # Nettoyer les fichiers temporaires
     if ass_path.exists():

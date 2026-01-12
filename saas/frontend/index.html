@@ -222,6 +222,18 @@
             </small>
         </div>
 
+        <div class="input-group" style="border: 2px solid #28a745; border-radius: 8px; padding: 16px; background: #f0fff4;">
+            <label for="transcriptionMode" style="font-weight: bold; color: #28a745;">⚡ Mode de transcription</label>
+            <select id="transcriptionMode" style="margin-top: 8px;">
+                <option value="youtube_subs" selected>🎬 Sous-titres YouTube (RAPIDE & GRATUIT - Recommandé)</option>
+                <option value="whisper">🎙️ Whisper API (Précis mais payant)</option>
+            </select>
+            <small style="color: #333; font-size: 13px; display: block; margin-top: 8px; line-height: 1.6;">
+                💡 <strong>Sous-titres YouTube</strong> : 2-3 min, $0, fonctionne sur 90% des vidéos<br>
+                💰 <strong>Whisper API</strong> : 4-6 min, $0.03-0.18 selon durée vidéo, 100% fiable
+            </small>
+        </div>
+
         <button id="processBtn" onclick="processVideo()">
             🚀 Générer le Short
         </button>
@@ -266,6 +278,7 @@
             const videoUrl = document.getElementById('videoUrl').value;
             const language = document.getElementById('language').value;
             const platform = document.getElementById('platform').value;
+            const transcriptionMode = document.getElementById('transcriptionMode').value;
             const cookiesFile = document.getElementById('cookiesFile').files[0];
 
             // Validation
@@ -286,6 +299,7 @@
                 formData.append('video_url', videoUrl);
                 formData.append('language', language);
                 formData.append('target_platform', platform);
+                formData.append('transcription_mode', transcriptionMode);
 
                 // Ajouter le fichier cookies s'il est fourni
                 if (cookiesFile) {

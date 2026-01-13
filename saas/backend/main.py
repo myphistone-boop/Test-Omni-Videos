@@ -274,7 +274,8 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             language=language,
             progress_callback=update_progress,
             youtube_url=video_url,
-            transcription_mode=transcription_mode
+            transcription_mode=transcription_mode,
+            cookies_path=cookies_path
         )
 
         # Nettoyer les fichiers temporaires

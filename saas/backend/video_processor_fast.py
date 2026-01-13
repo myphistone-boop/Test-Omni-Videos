@@ -19,7 +19,7 @@ from create_subtitled_video import YouTubeSubtitleGenerator
 
 def create_short_video_fast(input_video: str, output_path: str, language: str = "fr",
                            progress_callback=None, youtube_url: str = None,
-                           transcription_mode: str = "youtube_subs"):
+                           transcription_mode: str = "youtube_subs", cookies_path: str = None):
     """
     Crée un short RAPIDEMENT avec pipeline optimisé
 
@@ -36,6 +36,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         progress_callback: Fonction optionnelle callback(progress, message)
         youtube_url: URL YouTube (requis si transcription_mode='youtube_subs')
         transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
+        cookies_path: Chemin vers cookies.txt (requis pour YouTube subtitles)
 
     Returns:
         str: Chemin du fichier créé
@@ -58,7 +59,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
             progress_callback(35, "Récupération des sous-titres YouTube...")
 
         from youtube_downloader import download_youtube_subtitles
-        transcript_words = download_youtube_subtitles(youtube_url, language)
+        transcript_words = download_youtube_subtitles(youtube_url, language, cookies_path=cookies_path)
 
         if transcript_words:
             print(f"✅ {len(transcript_words)} mots récupérés des sous-titres YouTube (gratuit!)")

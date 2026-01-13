@@ -125,10 +125,7 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
 
     ydl_opts = {
         'skip_download': True,  # Ne pas télécharger la vidéo
-        'writesubtitles': True,  # Sous-titres manuels
-        'writeautomaticsub': True,  # Sous-titres auto-générés
-        'subtitleslangs': [language, 'en'],  # Langues préférées
-        'subtitlesformat': 'json3',  # Format JSON avec timestamps précis
+        # NE PAS writesubtitles - on veut juste les métadonnées dans info dict!
         'quiet': False,  # MODE DEBUG: Verbose!
         'no_warnings': False,  # MODE DEBUG: Montrer les warnings
         'cookiefile': cookies_file,

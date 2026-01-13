@@ -103,7 +103,7 @@ def download_video(url: str, output_path: str, cookies_path: str = None):
 
 def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str = None):
     """
-    Télécharge les sous-titres YouTube (auto-générés ou manuels)
+    Télécharge les sous-titres YouTube DIRECTEMENT via l'API (ULTRA-RAPIDE!)
 
     Args:
         url: URL YouTube
@@ -116,113 +116,86 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
         None: Si pas de sous-titres disponibles
     """
 
-    print(f"🎬 Tentative de récupération des sous-titres YouTube...")
+    print(f"🎬 Récupération DIRECTE des sous-titres YouTube...")
     print(f"   URL: {url}")
-    print(f"   Langue demandée: {language}")
+    print(f"   Langue: {language}")
 
-    cookies_file = cookies_path if cookies_path and Path(cookies_path).exists() else None
-    print(f"   Cookies: {cookies_file or 'AUCUN'}")
-
-    ydl_opts = {
-        'skip_download': True,  # Ne pas télécharger la vidéo
-        'quiet': False,  # MODE DEBUG: Verbose!
-        'no_warnings': False,  # MODE DEBUG: Montrer les warnings
-        'cookiefile': cookies_file,
-        'format': 'worst',  # Format le plus rapide à récupérer
-        'no_check_formats': True,  # Ne pas vérifier les formats
-    }
-
-    print(f"   Options yt-dlp: {ydl_opts}")
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print("\n📥 Extraction des infos vidéo...")
-            info = ydl.extract_info(url, download=False)
-
-            # Vérifier si des sous-titres sont disponibles
-            subtitles = info.get('subtitles', {})
-            automatic_captions = info.get('automatic_captions', {})
-
-            print(f"\n📋 DEBUG - Sous-titres disponibles:")
-
-            # Afficher seulement les langues principales (pas les traductions croisées)
-            main_manual = [k for k in subtitles.keys() if '-' not in k or k.count('-') == 1]
-            main_auto = [k for k in automatic_captions.keys() if '-' not in k or k.count('-') == 1]
-
-            print(f"   Manuels ({len(subtitles)} total): {main_manual[:10]}")
-            print(f"   Auto-générés ({len(automatic_captions)} total): {main_auto[:10]}")
-
-            # Priorité: sous-titres manuels > sous-titres auto
-            all_subs = {**automatic_captions, **subtitles}
-
-            if not all_subs:
-                print("❌ AUCUN sous-titre disponible (ni manuel ni auto-généré)")
-                print(f"   Info vidéo: title={info.get('title', 'N/A')}, id={info.get('id', 'N/A')}")
-                return None
-
-            # Afficher juste le NOMBRE au lieu de la liste complète
-            print(f"✅ Total: {len(all_subs)} langues disponibles")
-
-            # Chercher dans l'ordre: langue demandée, puis anglais
-            # Recherche FLEXIBLE: accepte fr, fr-CA, fr-FR, etc.
-            for search_lang in [language, 'en']:
-                print(f"\n🔍 Recherche sous-titres en '{search_lang}'...")
-
-                # Chercher une correspondance exacte OU une variante (fr-CA pour fr)
-                found_lang = None
-
-                # 1. Essayer correspondance exacte
-                if search_lang in all_subs:
-                    found_lang = search_lang
-                    print(f"   ✅ Trouvé exact: '{found_lang}'")
-                else:
-                    # 2. Chercher une variante (ex: fr-CA, fr-FR pour "fr")
-                    for available_lang in all_subs.keys():
-                        if available_lang.startswith(search_lang + '-'):
-                            found_lang = available_lang
-                            print(f"   ✅ Trouvé variante: '{found_lang}' pour '{search_lang}'")
-                            break
-
-                if found_lang:
-                    print(f"   ✅ Formats disponibles: {[s.get('ext') for s in all_subs[found_lang]]}")
-
-                    # Récupérer les sous-titres au format json3
-                    for sub_format in all_subs[found_lang]:
-                        print(f"   📝 Test format: {sub_format.get('ext')}")
-                        if sub_format.get('ext') == 'json3':
-                            print(f"   ✅ Format json3 trouvé! URL: {sub_format['url'][:100]}...")
-
-                            # Télécharger le fichier JSON
-                            sub_url = sub_format['url']
-
-                            # Utiliser yt-dlp pour télécharger le contenu
-                            import urllib.request
-                            print(f"   📥 Téléchargement du JSON...")
-                            with urllib.request.urlopen(sub_url) as response:
-                                sub_data = json.loads(response.read().decode('utf-8'))
-
-                            print(f"   ✅ JSON téléchargé, parsing...")
-                            # Parser au format Whisper
-                            words = parse_youtube_subtitles_to_whisper(sub_data)
-                            print(f"   ✅✅✅ {len(words)} mots extraits des sous-titres YouTube!")
-                            return words
-                else:
-                    print(f"   ❌ Pas de sous-titres en '{search_lang}' (ni variantes)")
-
-            print("\n❌ ERREUR: Format json3 non disponible dans aucune langue")
-            # Afficher seulement les langues principales
-            main_langs = [k for k in all_subs.keys() if '-' not in k or k.count('-') == 1]
-            print(f"   Langues disponibles ({len(all_subs)} total): {main_langs[:20]}")
-            return None
-
-    except Exception as e:
-        print(f"❌❌❌ EXCEPTION lors de la récupération des sous-titres:")
-        print(f"   Type: {type(e).__name__}")
-        print(f"   Message: {e}")
-        import traceback
-        print(f"   Stack trace:")
-        traceback.print_exc()
+    # Extraire l'ID vidéo de l'URL
+    import re
+    video_id_match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11}).*', url)
+    if not video_id_match:
+        print("❌ ID vidéo non trouvé dans l'URL")
         return None
+
+    video_id = video_id_match.group(1)
+    print(f"   ID vidéo: {video_id}")
+
+    # Essayer plusieurs variantes de langue
+    lang_variants = [language]
+    if language == 'fr':
+        lang_variants.extend(['fr-CA', 'fr-FR'])
+    elif language == 'en':
+        lang_variants.extend(['en-US', 'en-GB'])
+
+    # Essayer d'abord sans variante, puis avec
+    lang_variants.append('en')  # Fallback sur anglais
+
+    import urllib.request
+    import urllib.error
+    import http.cookiejar
+
+    for lang in lang_variants:
+        try:
+            # URL directe de l'API YouTube timedtext
+            # fmt=json3 donne le format avec timestamps mot par mot
+            timedtext_url = f"https://www.youtube.com/api/timedtext?v={video_id}&lang={lang}&fmt=json3"
+
+            print(f"\n🔍 Essai langue '{lang}'...")
+            print(f"   URL: {timedtext_url[:80]}...")
+
+            # Créer une requête avec cookies si disponibles
+            req = urllib.request.Request(timedtext_url)
+
+            # Ajouter les cookies si disponibles
+            if cookies_path and Path(cookies_path).exists():
+                # Lire les cookies depuis le fichier Netscape
+                cookie_jar = http.cookiejar.MozillaCookieJar(cookies_path)
+                cookie_jar.load(ignore_discard=True, ignore_expires=True)
+
+                # Créer un opener avec les cookies
+                opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
+                response = opener.open(req, timeout=10)
+            else:
+                response = urllib.request.urlopen(req, timeout=10)
+
+            # Lire et parser le JSON
+            sub_data = json.loads(response.read().decode('utf-8'))
+
+            # Vérifier que ce n'est pas vide
+            if not sub_data or 'events' not in sub_data or not sub_data['events']:
+                print(f"   ❌ Sous-titres vides pour '{lang}'")
+                continue
+
+            print(f"   ✅ Sous-titres trouvés! Parsing...")
+
+            # Parser au format Whisper
+            words = parse_youtube_subtitles_to_whisper(sub_data)
+            print(f"   ✅✅✅ {len(words)} mots extraits des sous-titres YouTube!")
+            return words
+
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                print(f"   ❌ Pas de sous-titres en '{lang}' (404)")
+            else:
+                print(f"   ❌ Erreur HTTP {e.code} pour '{lang}'")
+            continue
+        except Exception as e:
+            print(f"   ❌ Erreur pour '{lang}': {e}")
+            continue
+
+    print("\n❌ Aucun sous-titre trouvé dans aucune langue testée")
+    print(f"   Langues essayées: {lang_variants}")
+    return None
 
 
 def parse_youtube_subtitles_to_whisper(sub_data):

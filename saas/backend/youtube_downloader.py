@@ -146,8 +146,13 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
             automatic_captions = info.get('automatic_captions', {})
 
             print(f"\n📋 DEBUG - Sous-titres disponibles:")
-            print(f"   Manuels: {list(subtitles.keys())}")
-            print(f"   Auto-générés: {list(automatic_captions.keys())}")
+
+            # Afficher seulement les langues principales (pas les traductions croisées)
+            main_manual = [k for k in subtitles.keys() if '-' not in k or k.count('-') == 1]
+            main_auto = [k for k in automatic_captions.keys() if '-' not in k or k.count('-') == 1]
+
+            print(f"   Manuels ({len(subtitles)} total): {main_manual[:10]}")
+            print(f"   Auto-générés ({len(automatic_captions)} total): {main_auto[:10]}")
 
             # Priorité: sous-titres manuels > sous-titres auto
             all_subs = {**automatic_captions, **subtitles}
@@ -157,7 +162,8 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                 print(f"   Info vidéo: title={info.get('title', 'N/A')}, id={info.get('id', 'N/A')}")
                 return None
 
-            print(f"✅ Total langues disponibles: {list(all_subs.keys())}")
+            # Afficher juste le NOMBRE au lieu de la liste complète
+            print(f"✅ Total: {len(all_subs)} langues disponibles")
 
             # Chercher dans l'ordre: langue demandée, puis anglais
             # Recherche FLEXIBLE: accepte fr, fr-CA, fr-FR, etc.
@@ -206,7 +212,9 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                     print(f"   ❌ Pas de sous-titres en '{search_lang}' (ni variantes)")
 
             print("\n❌ ERREUR: Format json3 non disponible dans aucune langue")
-            print(f"   Langues disponibles: {list(all_subs.keys())}")
+            # Afficher seulement les langues principales
+            main_langs = [k for k in all_subs.keys() if '-' not in k or k.count('-') == 1]
+            print(f"   Langues disponibles ({len(all_subs)} total): {main_langs[:20]}")
             return None
 
     except Exception as e:

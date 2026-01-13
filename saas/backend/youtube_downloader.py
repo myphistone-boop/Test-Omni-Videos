@@ -117,8 +117,11 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
     """
 
     print(f"🎬 Tentative de récupération des sous-titres YouTube...")
+    print(f"   URL: {url}")
+    print(f"   Langue demandée: {language}")
 
     cookies_file = cookies_path if cookies_path and Path(cookies_path).exists() else None
+    print(f"   Cookies: {cookies_file or 'AUCUN'}")
 
     ydl_opts = {
         'skip_download': True,  # Ne pas télécharger la vidéo
@@ -126,52 +129,76 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
         'writeautomaticsub': True,  # Sous-titres auto-générés
         'subtitleslangs': [language, 'en'],  # Langues préférées
         'subtitlesformat': 'json3',  # Format JSON avec timestamps précis
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,  # MODE DEBUG: Verbose!
+        'no_warnings': False,  # MODE DEBUG: Montrer les warnings
         'cookiefile': cookies_file,
     }
 
+    print(f"   Options yt-dlp: {ydl_opts}")
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print("\n📥 Extraction des infos vidéo...")
             info = ydl.extract_info(url, download=False)
 
             # Vérifier si des sous-titres sont disponibles
             subtitles = info.get('subtitles', {})
             automatic_captions = info.get('automatic_captions', {})
 
+            print(f"\n📋 DEBUG - Sous-titres disponibles:")
+            print(f"   Manuels: {list(subtitles.keys())}")
+            print(f"   Auto-générés: {list(automatic_captions.keys())}")
+
             # Priorité: sous-titres manuels > sous-titres auto
             all_subs = {**automatic_captions, **subtitles}
 
             if not all_subs:
-                print("❌ Aucun sous-titre disponible")
+                print("❌ AUCUN sous-titre disponible (ni manuel ni auto-généré)")
+                print(f"   Info vidéo: title={info.get('title', 'N/A')}, id={info.get('id', 'N/A')}")
                 return None
+
+            print(f"✅ Total langues disponibles: {list(all_subs.keys())}")
 
             # Chercher dans l'ordre: langue demandée, puis anglais
             for lang in [language, 'en']:
+                print(f"\n🔍 Recherche sous-titres en '{lang}'...")
                 if lang in all_subs:
-                    print(f"✅ Sous-titres trouvés en '{lang}'")
+                    print(f"   ✅ Trouvés! Formats disponibles: {[s.get('ext') for s in all_subs[lang]]}")
 
                     # Récupérer les sous-titres au format json3
                     for sub_format in all_subs[lang]:
+                        print(f"   📝 Test format: {sub_format.get('ext')}")
                         if sub_format.get('ext') == 'json3':
+                            print(f"   ✅ Format json3 trouvé! URL: {sub_format['url'][:100]}...")
+
                             # Télécharger le fichier JSON
                             sub_url = sub_format['url']
 
                             # Utiliser yt-dlp pour télécharger le contenu
                             import urllib.request
+                            print(f"   📥 Téléchargement du JSON...")
                             with urllib.request.urlopen(sub_url) as response:
                                 sub_data = json.loads(response.read().decode('utf-8'))
 
+                            print(f"   ✅ JSON téléchargé, parsing...")
                             # Parser au format Whisper
                             words = parse_youtube_subtitles_to_whisper(sub_data)
-                            print(f"✅ {len(words)} mots extraits des sous-titres YouTube")
+                            print(f"   ✅✅✅ {len(words)} mots extraits des sous-titres YouTube!")
                             return words
+                else:
+                    print(f"   ❌ Pas de sous-titres en '{lang}'")
 
-            print("❌ Format json3 non disponible")
+            print("\n❌ ERREUR: Format json3 non disponible dans aucune langue")
+            print(f"   Langues disponibles: {list(all_subs.keys())}")
             return None
 
     except Exception as e:
-        print(f"❌ Erreur lors de la récupération des sous-titres: {e}")
+        print(f"❌❌❌ EXCEPTION lors de la récupération des sous-titres:")
+        print(f"   Type: {type(e).__name__}")
+        print(f"   Message: {e}")
+        import traceback
+        print(f"   Stack trace:")
+        traceback.print_exc()
         return None
 
 

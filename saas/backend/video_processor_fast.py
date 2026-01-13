@@ -63,8 +63,10 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         if transcript_words:
             print(f"✅ {len(transcript_words)} mots récupérés des sous-titres YouTube (gratuit!)")
         else:
-            print("⚠️ Pas de sous-titres YouTube, fallback vers Whisper...")
-            transcription_mode = "whisper"  # Fallback
+            # MODE DEBUG: PAS DE FALLBACK - On veut voir pourquoi ça échoue!
+            error_msg = "❌ ÉCHEC: Pas de sous-titres YouTube trouvés! Vérifiez les logs ci-dessus pour voir pourquoi."
+            print(error_msg)
+            raise Exception(error_msg)
 
     if transcription_mode == "whisper" or transcript_words is None:
         # MODE 2: Whisper API (PAYANT mais FIABLE)

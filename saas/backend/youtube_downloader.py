@@ -125,10 +125,11 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
 
     ydl_opts = {
         'skip_download': True,  # Ne pas télécharger la vidéo
-        # NE PAS writesubtitles - on veut juste les métadonnées dans info dict!
         'quiet': False,  # MODE DEBUG: Verbose!
         'no_warnings': False,  # MODE DEBUG: Montrer les warnings
         'cookiefile': cookies_file,
+        'format': 'worst',  # Format le plus rapide à récupérer
+        'no_check_formats': True,  # Ne pas vérifier les formats
     }
 
     print(f"   Options yt-dlp: {ydl_opts}")

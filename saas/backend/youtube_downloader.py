@@ -160,13 +160,30 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
             print(f"✅ Total langues disponibles: {list(all_subs.keys())}")
 
             # Chercher dans l'ordre: langue demandée, puis anglais
-            for lang in [language, 'en']:
-                print(f"\n🔍 Recherche sous-titres en '{lang}'...")
-                if lang in all_subs:
-                    print(f"   ✅ Trouvés! Formats disponibles: {[s.get('ext') for s in all_subs[lang]]}")
+            # Recherche FLEXIBLE: accepte fr, fr-CA, fr-FR, etc.
+            for search_lang in [language, 'en']:
+                print(f"\n🔍 Recherche sous-titres en '{search_lang}'...")
+
+                # Chercher une correspondance exacte OU une variante (fr-CA pour fr)
+                found_lang = None
+
+                # 1. Essayer correspondance exacte
+                if search_lang in all_subs:
+                    found_lang = search_lang
+                    print(f"   ✅ Trouvé exact: '{found_lang}'")
+                else:
+                    # 2. Chercher une variante (ex: fr-CA, fr-FR pour "fr")
+                    for available_lang in all_subs.keys():
+                        if available_lang.startswith(search_lang + '-'):
+                            found_lang = available_lang
+                            print(f"   ✅ Trouvé variante: '{found_lang}' pour '{search_lang}'")
+                            break
+
+                if found_lang:
+                    print(f"   ✅ Formats disponibles: {[s.get('ext') for s in all_subs[found_lang]]}")
 
                     # Récupérer les sous-titres au format json3
-                    for sub_format in all_subs[lang]:
+                    for sub_format in all_subs[found_lang]:
                         print(f"   📝 Test format: {sub_format.get('ext')}")
                         if sub_format.get('ext') == 'json3':
                             print(f"   ✅ Format json3 trouvé! URL: {sub_format['url'][:100]}...")
@@ -186,7 +203,7 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                             print(f"   ✅✅✅ {len(words)} mots extraits des sous-titres YouTube!")
                             return words
                 else:
-                    print(f"   ❌ Pas de sous-titres en '{lang}'")
+                    print(f"   ❌ Pas de sous-titres en '{search_lang}' (ni variantes)")
 
             print("\n❌ ERREUR: Format json3 non disponible dans aucune langue")
             print(f"   Langues disponibles: {list(all_subs.keys())}")

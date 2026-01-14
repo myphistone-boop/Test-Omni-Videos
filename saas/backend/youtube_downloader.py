@@ -146,68 +146,105 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
 
     for lang in lang_variants:
         try:
+            print(f"\n{'='*60}")
+            print(f"🔍 [STEP 1] Essai langue '{lang}'")
+            print(f"{'='*60}")
+
             # URL directe de l'API YouTube timedtext
             # fmt=json3 donne le format avec timestamps mot par mot
             timedtext_url = f"https://www.youtube.com/api/timedtext?v={video_id}&lang={lang}&fmt=json3"
-
-            print(f"\n🔍 Essai langue '{lang}'...")
-            print(f"   URL: {timedtext_url[:80]}...")
+            print(f"   [STEP 1.1] URL construite: {timedtext_url}")
 
             # Créer une requête avec cookies si disponibles
+            print(f"   [STEP 1.2] Création de la requête HTTP...")
             req = urllib.request.Request(timedtext_url)
 
             # Ajouter des headers pour simuler un navigateur réel
+            print(f"   [STEP 1.3] Ajout des headers navigateur...")
             req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             req.add_header('Accept', 'application/json, text/javascript, */*; q=0.01')
             req.add_header('Accept-Language', 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7')
             req.add_header('Referer', f'https://www.youtube.com/watch?v={video_id}')
+            print(f"   [STEP 1.4] Headers ajoutés ✓")
 
             # Ajouter les cookies si disponibles
             if cookies_path and Path(cookies_path).exists():
+                print(f"   [STEP 1.5] Chargement des cookies depuis: {cookies_path}")
                 # Lire les cookies depuis le fichier Netscape
                 cookie_jar = http.cookiejar.MozillaCookieJar(cookies_path)
                 cookie_jar.load(ignore_discard=True, ignore_expires=True)
+                print(f"   [STEP 1.6] {len(cookie_jar)} cookies chargés")
 
                 # Créer un opener avec les cookies
+                print(f"   [STEP 1.7] Envoi de la requête avec cookies...")
                 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
                 response = opener.open(req, timeout=10)
             else:
+                print(f"   [STEP 1.5] Pas de cookies - envoi requête sans authentification...")
                 response = urllib.request.urlopen(req, timeout=10)
 
+            print(f"   [STEP 2] Requête envoyée - Code HTTP: {response.getcode()}")
+
             # Lire la réponse
+            print(f"   [STEP 3] Lecture de la réponse...")
             response_text = response.read().decode('utf-8')
+            print(f"   [STEP 3.1] Réponse reçue - Taille: {len(response_text)} caractères")
 
             # Debug: afficher le début de la réponse
-            print(f"   📄 Réponse (premiers 100 chars): {response_text[:100]}")
+            print(f"   [STEP 3.2] Premiers 100 chars: {response_text[:100]}")
 
             # Vérifier que c'est bien du JSON
+            print(f"   [STEP 4] Validation format JSON...")
             if not response_text or not response_text.strip().startswith('{'):
-                print(f"   ❌ Réponse invalide (pas du JSON) pour '{lang}'")
+                print(f"   [STEP 4.1] ❌ ÉCHEC - Pas du JSON pour '{lang}'")
+                print(f"   [STEP 4.2] Type réponse: {type(response_text)}, Commence par: '{response_text[:50]}'")
                 continue
+
+            print(f"   [STEP 4.3] ✓ Format JSON valide")
 
             # Parser le JSON
+            print(f"   [STEP 5] Parsing JSON...")
             sub_data = json.loads(response_text)
+            print(f"   [STEP 5.1] ✓ JSON parsé - Clés: {list(sub_data.keys())}")
 
             # Vérifier que ce n'est pas vide
+            print(f"   [STEP 6] Validation contenu...")
             if not sub_data or 'events' not in sub_data or not sub_data['events']:
-                print(f"   ❌ Sous-titres vides pour '{lang}'")
+                print(f"   [STEP 6.1] ❌ ÉCHEC - Sous-titres vides pour '{lang}'")
+                print(f"   [STEP 6.2] Contenu: {sub_data}")
                 continue
 
-            print(f"   ✅ Sous-titres trouvés! Parsing...")
+            print(f"   [STEP 6.3] ✓ {len(sub_data.get('events', []))} événements trouvés")
 
+            print(f"   [STEP 7] Parsing au format Whisper...")
             # Parser au format Whisper
             words = parse_youtube_subtitles_to_whisper(sub_data)
-            print(f"   ✅✅✅ {len(words)} mots extraits des sous-titres YouTube!")
+            print(f"   [STEP 7.1] ✓ Parsing terminé")
+
+            print(f"\n{'='*60}")
+            print(f"✅✅✅ SUCCÈS: {len(words)} mots extraits!")
+            print(f"{'='*60}\n")
             return words
 
         except urllib.error.HTTPError as e:
+            print(f"\n   [ERROR] HTTPError pour '{lang}':")
+            print(f"   - Code: {e.code}")
+            print(f"   - Raison: {e.reason}")
             if e.code == 404:
-                print(f"   ❌ Pas de sous-titres en '{lang}' (404)")
-            else:
-                print(f"   ❌ Erreur HTTP {e.code} pour '{lang}'")
+                print(f"   - Signification: Pas de sous-titres disponibles")
+            continue
+        except json.JSONDecodeError as e:
+            print(f"\n   [ERROR] JSONDecodeError pour '{lang}':")
+            print(f"   - Message: {e}")
+            print(f"   - Position: ligne {e.lineno}, col {e.colno}")
             continue
         except Exception as e:
-            print(f"   ❌ Erreur pour '{lang}': {e}")
+            print(f"\n   [ERROR] Exception pour '{lang}':")
+            print(f"   - Type: {type(e).__name__}")
+            print(f"   - Message: {e}")
+            import traceback
+            print(f"   - Traceback:")
+            traceback.print_exc()
             continue
 
     print("\n❌ Aucun sous-titre trouvé dans aucune langue testée")

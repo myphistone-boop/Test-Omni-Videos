@@ -6,6 +6,7 @@ Télécharge des vidéos YouTube via yt-dlp avec Cookie Pool centralisé
 import yt_dlp
 import os
 import json
+import asyncio
 from pathlib import Path
 
 # Import Cookie Pool Manager
@@ -15,6 +16,43 @@ try:
 except ImportError:
     print("⚠️  Cookie Pool Manager non disponible (import échoué)")
     COOKIE_POOL_AVAILABLE = False
+
+# Import Interactive Cookie Capture
+try:
+    from interactive_cookie_capture import InteractiveCookieCapture
+    INTERACTIVE_CAPTURE_AVAILABLE = True
+except ImportError:
+    print("⚠️  Interactive Cookie Capture non disponible (import échoué)")
+    INTERACTIVE_CAPTURE_AVAILABLE = False
+
+
+def get_cookies_interactively(account_name: str = "user") -> str:
+    """
+    Déclenche la capture interactive de cookies YouTube
+
+    Args:
+        account_name: Nom du compte pour sauvegarder les cookies
+
+    Returns:
+        str: Chemin du fichier cookies capturé
+    """
+    if not INTERACTIVE_CAPTURE_AVAILABLE:
+        raise Exception(
+            "Interactive Cookie Capture non disponible. "
+            "Vérifiez que interactive_cookie_capture.py est présent."
+        )
+
+    print("\n" + "="*70)
+    print("🔐 COOKIES REQUIS POUR CONTINUER")
+    print("="*70)
+    print("\n📋 Vous devez vous connecter à YouTube pour continuer.")
+    print("   Un navigateur va s'ouvrir automatiquement.\n")
+
+    # Créer le capturer et lancer la capture
+    capturer = InteractiveCookieCapture()
+    cookies_path = asyncio.run(capturer.capture_cookies(account_name))
+
+    return cookies_path
 
 
 def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) -> str:
@@ -127,7 +165,23 @@ def download_video(url: str, output_path: str, cookies_path: str = None):
         else:
             print("⚠️  Cookie Pool saturé ou vide")
 
-    # Aucun cookie disponible
+    # Fallback sur capture interactive
+    if INTERACTIVE_CAPTURE_AVAILABLE:
+        print("\n🔄 Aucun cookie disponible dans le pool")
+        print("   → Déclenchement de la capture interactive...\n")
+
+        try:
+            cookies_path = get_cookies_interactively()
+            print(f"\n✅ Cookies capturés: {cookies_path}")
+            print("🔄 Nouvelle tentative de téléchargement...\n")
+
+            return download_with_ytdlp(url, output_path, cookies_path)
+
+        except Exception as e:
+            print(f"\n❌ Erreur lors de la capture interactive: {e}")
+            raise
+
+    # Aucun cookie disponible et pas de capture interactive
     raise Exception(
         "Aucun cookie YouTube disponible. "
         "Le Cookie Pool est vide ou saturé. "
@@ -414,6 +468,27 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
         if using_pool and COOKIE_POOL_AVAILABLE:
             record_request_result(cookies_path, success=False,
                                   error_msg="API directe et yt-dlp ont échoué")
+
+        # Dernière tentative: capture interactive (si pas déjà fait avec cookies)
+        if INTERACTIVE_CAPTURE_AVAILABLE and not cookies_path:
+            print("\n🔄 Dernière tentative: capture interactive de cookies...")
+
+            try:
+                new_cookies_path = get_cookies_interactively()
+                print(f"\n✅ Cookies capturés: {new_cookies_path}")
+                print("🔄 Nouvelle tentative avec yt-dlp...\n")
+
+                # Retry with the new cookies
+                result = download_youtube_subtitles_with_ytdlp(url, language, new_cookies_path)
+
+                if result:
+                    print(f"✅ Succès avec cookies interactifs!")
+                    return result
+                else:
+                    print(f"❌ Échec même avec cookies interactifs")
+
+            except Exception as capture_error:
+                print(f"\n❌ Erreur lors de la capture interactive: {capture_error}")
 
         return None
 

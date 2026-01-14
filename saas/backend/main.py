@@ -77,46 +77,39 @@ async def process_video(
     video_url: str = Form(...),
     language: str = Form("fr"),
     target_platform: str = Form("tiktok"),
-    transcription_mode: str = Form("youtube_subs"),  # 'youtube_subs' ou 'whisper'
-    cookies_file: Optional[UploadFile] = File(None)
+    transcription_mode: str = Form("youtube_subs")  # 'youtube_subs' ou 'whisper'
 ):
     """
-    Lance le processing d'une vidéo YouTube
+    Lance le processing d'une vidéo YouTube avec Cookie Pool automatique
 
     Args:
         video_url: URL YouTube
         language: Langue (fr/en)
         target_platform: Plateforme cible
         transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
-        cookies_file: Fichier cookies.txt (optionnel)
 
     Returns:
         JobStatus avec job_id pour tracking
+
+    Note:
+        Les cookies YouTube sont gérés automatiquement par le Cookie Pool centralisé.
+        Pas besoin d'uploader de cookies.txt !
     """
 
     # Créer un job unique
     job_id = str(uuid.uuid4())
 
-    # Sauvegarder les cookies si fournis
-    cookies_path = None
-    if cookies_file:
-        cookies_path = OUTPUT_DIR / f"{job_id}_cookies.txt"
-        with open(cookies_path, "wb") as f:
-            content = await cookies_file.read()
-            f.write(content)
-
-    # Initialiser le job
+    # Initialiser le job (plus besoin de cookies_path)
     jobs_db[job_id] = {
         "job_id": job_id,
         "status": "pending",
         "progress": 0,
-        "message": "Job créé, en attente de processing",
+        "message": "Job créé, en attente de processing (Cookie Pool activé)",
         "created_at": datetime.now(),
         "video_url": video_url,
         "language": language,
         "target_platform": target_platform,
-        "transcription_mode": transcription_mode,
-        "cookies_path": str(cookies_path) if cookies_path else None
+        "transcription_mode": transcription_mode
     }
 
     # Lancer le processing en background
@@ -221,7 +214,7 @@ async def list_jobs():
 
 def process_video_task(job_id: str, video_url: str, language: str, target_platform: str, transcription_mode: str = "youtube_subs"):
     """
-    Traite une vidéo YouTube en short
+    Traite une vidéo YouTube en short avec Cookie Pool automatique
 
     Cette fonction sera remplacée par une tâche Celery en production
     Pour l'instant elle tourne en background task FastAPI
@@ -238,7 +231,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         # Update status: en cours
         jobs_db[job_id]["status"] = "processing"
         jobs_db[job_id]["progress"] = 10
-        jobs_db[job_id]["message"] = "Téléchargement de la vidéo..."
+        jobs_db[job_id]["message"] = "Téléchargement de la vidéo (Cookie Pool)..."
 
         # Import des modules de processing
         from youtube_downloader import download_video
@@ -246,12 +239,9 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 30
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
 
-        # Récupérer le chemin des cookies si fourni
-        cookies_path = jobs_db[job_id].get("cookies_path")
-
-        # Télécharger la vidéo
+        # Télécharger la vidéo (utilise automatiquement le Cookie Pool)
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video, cookies_path=cookies_path)
+        download_video(video_url, temp_video, cookies_path=None)  # None = utilise le pool
 
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
@@ -267,7 +257,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             jobs_db[job_id]["progress"] = progress
             jobs_db[job_id]["message"] = message
 
-        # Créer le short avec pipeline rapide
+        # Créer le short avec pipeline rapide (utilise automatiquement le Cookie Pool)
         create_short_video_fast(
             input_video=temp_video,
             output_path=str(output_path),
@@ -275,16 +265,12 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             progress_callback=update_progress,
             youtube_url=video_url,
             transcription_mode=transcription_mode,
-            cookies_path=cookies_path
+            cookies_path=None  # None = utilise le pool automatiquement
         )
 
         # Nettoyer les fichiers temporaires
         if os.path.exists(temp_video):
             os.remove(temp_video)
-
-        # Nettoyer le fichier cookies
-        if cookies_path and os.path.exists(cookies_path):
-            os.remove(cookies_path)
 
         # Succès
         jobs_db[job_id]["status"] = "completed"

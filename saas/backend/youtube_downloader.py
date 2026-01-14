@@ -1,12 +1,20 @@
 """
 YouTube downloader pour le backend SaaS
-Télécharge des vidéos YouTube via yt-dlp avec cookies utilisateur
+Télécharge des vidéos YouTube via yt-dlp avec Cookie Pool centralisé
 """
 
 import yt_dlp
 import os
 import json
 from pathlib import Path
+
+# Import Cookie Pool Manager
+try:
+    from cookie_pool_manager import get_cookie_for_request, record_request_result
+    COOKIE_POOL_AVAILABLE = True
+except ImportError:
+    print("⚠️  Cookie Pool Manager non disponible (import échoué)")
+    COOKIE_POOL_AVAILABLE = False
 
 
 def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) -> str:
@@ -71,39 +79,70 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
 
 def download_video(url: str, output_path: str, cookies_path: str = None):
     """
-    Télécharge une vidéo YouTube
+    Télécharge une vidéo YouTube avec Cookie Pool automatique
 
-    Stratégie simple:
-    - Si cookies fournis → téléchargement avec yt-dlp
-    - Sinon → erreur explicite demandant les cookies
+    Stratégie intelligente:
+    - Si cookies_path fourni → utilise ces cookies (priorité)
+    - Sinon → utilise le Cookie Pool centralisé
+    - Si Pool vide → erreur explicite
 
     Args:
         url: URL de la vidéo YouTube
         output_path: Chemin complet où sauvegarder la vidéo
-        cookies_path: Chemin vers le fichier cookies.txt (REQUIS)
+        cookies_path: Chemin vers fichier cookies.txt (optionnel)
 
     Returns:
         str: Chemin du fichier téléchargé
 
     Raises:
-        Exception: Si pas de cookies ou échec du téléchargement
+        Exception: Si pas de cookies disponibles ou échec téléchargement
     """
 
-    # Vérifier si les cookies sont fournis
-    if not cookies_path or not Path(cookies_path).exists():
-        raise Exception(
-            "Cookies YouTube requis pour télécharger les vidéos. "
-            "Veuillez uploader votre fichier cookies.txt. "
-            "Instructions: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
-        )
+    # Si cookies fournis explicitement, les utiliser
+    if cookies_path and Path(cookies_path).exists():
+        print(f"🔑 Utilisation des cookies fournis: {cookies_path}")
+        return download_with_ytdlp(url, output_path, cookies_path)
 
-    # Télécharger avec cookies
-    return download_with_ytdlp(url, output_path, cookies_path)
+    # Sinon, utiliser le Cookie Pool
+    if COOKIE_POOL_AVAILABLE:
+        pool_cookies = get_cookie_for_request()
+
+        if pool_cookies:
+            print(f"🔄 Utilisation du Cookie Pool: {Path(pool_cookies).name}")
+
+            try:
+                # Télécharger avec les cookies du pool
+                result = download_with_ytdlp(url, output_path, pool_cookies)
+
+                # Enregistrer le succès
+                record_request_result(pool_cookies, success=True)
+
+                return result
+
+            except Exception as e:
+                # Enregistrer l'échec
+                error_msg = str(e)
+                record_request_result(pool_cookies, success=False, error_msg=error_msg)
+                raise
+        else:
+            print("⚠️  Cookie Pool saturé ou vide")
+
+    # Aucun cookie disponible
+    raise Exception(
+        "Aucun cookie YouTube disponible. "
+        "Le Cookie Pool est vide ou saturé. "
+        "Attendez quelques minutes ou configurez le pool: /home/shorts/cookie_pool/"
+    )
 
 
 def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str = None):
     """
     Télécharge les sous-titres YouTube DIRECTEMENT via l'API (ULTRA-RAPIDE!)
+
+    Stratégie intelligente:
+    - Si cookies_path fourni → utilise ces cookies
+    - Sinon → utilise le Cookie Pool centralisé
+    - Enregistre succès/échec dans le pool
 
     Args:
         url: URL YouTube
@@ -119,6 +158,14 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
     print(f"🎬 Récupération DIRECTE des sous-titres YouTube...")
     print(f"   URL: {url}")
     print(f"   Langue: {language}")
+
+    # Utiliser Cookie Pool si pas de cookies fournis
+    using_pool = False
+    if not cookies_path and COOKIE_POOL_AVAILABLE:
+        cookies_path = get_cookie_for_request()
+        using_pool = True
+        if cookies_path:
+            print(f"🔄 Utilisation du Cookie Pool: {Path(cookies_path).name}")
 
     # Extraire l'ID vidéo de l'URL
     import re
@@ -231,6 +278,11 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                 print(f"\n{'='*60}")
                 print(f"✅✅✅ SUCCÈS: {len(words)} mots extraits ({subtitle_type})!")
                 print(f"{'='*60}\n")
+
+                # Enregistrer le succès dans le pool
+                if using_pool and COOKIE_POOL_AVAILABLE:
+                    record_request_result(cookies_path, success=True)
+
                 return words
 
             except urllib.error.HTTPError as e:
@@ -256,6 +308,12 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
 
     print("\n❌ Aucun sous-titre trouvé dans aucune langue testée")
     print(f"   Langues essayées: {lang_variants}")
+
+    # Enregistrer l'échec dans le pool
+    if using_pool and COOKIE_POOL_AVAILABLE:
+        record_request_result(cookies_path, success=False,
+                              error_msg="Aucun sous-titre trouvé")
+
     return None
 
 

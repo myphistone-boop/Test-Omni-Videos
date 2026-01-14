@@ -135,6 +135,93 @@ def download_video(url: str, output_path: str, cookies_path: str = None):
     )
 
 
+def download_youtube_subtitles_with_ytdlp(url: str, language: str = "fr", cookies_path: str = None):
+    """
+    Fallback: Télécharge les sous-titres YouTube via yt-dlp (plus robuste)
+
+    Args:
+        url: URL YouTube
+        language: Code langue (fr, en, etc.)
+        cookies_path: Chemin cookies (optionnel)
+
+    Returns:
+        list[dict]: Liste de mots avec timestamps au format Whisper
+        None: Si pas de sous-titres disponibles
+    """
+
+    print(f"🔄 Tentative via yt-dlp...")
+
+    cookies_file = cookies_path if cookies_path and Path(cookies_path).exists() else None
+
+    ydl_opts = {
+        'skip_download': True,
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitleslangs': [language, 'en'],
+        'subtitlesformat': 'json3',
+        'quiet': True,
+        'no_warnings': True,
+        'cookiefile': cookies_file,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            subtitles = info.get('subtitles', {})
+            automatic_captions = info.get('automatic_captions', {})
+            all_subs = {**automatic_captions, **subtitles}
+
+            if not all_subs:
+                print("❌ yt-dlp: Aucun sous-titre disponible")
+                return None
+
+            # Essayer plusieurs variantes de langues
+            lang_variants = [language]
+            if language == 'fr':
+                lang_variants.extend(['fr-FR', 'fr-CA'])
+            elif language == 'en':
+                lang_variants.extend(['en-US', 'en-GB'])
+            lang_variants.append('en')
+
+            print(f"🔍 yt-dlp: Langues disponibles: {list(all_subs.keys())}")
+
+            for lang in lang_variants:
+                if lang in all_subs:
+                    print(f"✅ yt-dlp: Sous-titres trouvés en '{lang}'")
+
+                    for sub_format in all_subs[lang]:
+                        if sub_format.get('ext') == 'json3':
+                            sub_url = sub_format['url']
+
+                            try:
+                                import urllib.request
+                                with urllib.request.urlopen(sub_url, timeout=10) as response:
+                                    content = response.read().decode('utf-8')
+
+                                    if not content.strip().startswith('{'):
+                                        print(f"⚠️  yt-dlp: Réponse invalide pour '{lang}'")
+                                        continue
+
+                                    sub_data = json.loads(content)
+                                    words = parse_youtube_subtitles_to_whisper(sub_data)
+
+                                    if words and len(words) > 0:
+                                        print(f"✅ yt-dlp: {len(words)} mots extraits!")
+                                        return words
+
+                            except Exception as e:
+                                print(f"❌ yt-dlp: Erreur pour '{lang}': {e}")
+                                continue
+
+            print("❌ yt-dlp: Aucun sous-titre valide trouvé")
+            return None
+
+    except Exception as e:
+        print(f"❌ yt-dlp: Erreur globale: {e}")
+        return None
+
+
 def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str = None):
     """
     Télécharge les sous-titres YouTube DIRECTEMENT via l'API (ULTRA-RAPIDE!)
@@ -306,15 +393,29 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                 traceback.print_exc()
                 continue
 
-    print("\n❌ Aucun sous-titre trouvé dans aucune langue testée")
+    print("\n❌ API directe a échoué pour toutes les langues testées")
     print(f"   Langues essayées: {lang_variants}")
+    print("\n🔄 FALLBACK: Tentative avec yt-dlp (plus lent mais plus fiable)...\n")
 
-    # Enregistrer l'échec dans le pool
-    if using_pool and COOKIE_POOL_AVAILABLE:
-        record_request_result(cookies_path, success=False,
-                              error_msg="Aucun sous-titre trouvé")
+    # FALLBACK: Utiliser yt-dlp si l'API directe échoue
+    try:
+        result = download_youtube_subtitles_with_ytdlp(url, language, cookies_path)
 
-    return None
+        # Si yt-dlp a réussi, enregistrer le succès
+        if result and using_pool and COOKIE_POOL_AVAILABLE:
+            record_request_result(cookies_path, success=True)
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Fallback yt-dlp a également échoué: {e}")
+
+        # Enregistrer l'échec dans le pool
+        if using_pool and COOKIE_POOL_AVAILABLE:
+            record_request_result(cookies_path, success=False,
+                                  error_msg="API directe et yt-dlp ont échoué")
+
+        return None
 
 
 def parse_youtube_subtitles_to_whisper(sub_data):

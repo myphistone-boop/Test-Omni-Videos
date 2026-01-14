@@ -156,6 +156,12 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
             # Créer une requête avec cookies si disponibles
             req = urllib.request.Request(timedtext_url)
 
+            # Ajouter des headers pour simuler un navigateur réel
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            req.add_header('Accept', 'application/json, text/javascript, */*; q=0.01')
+            req.add_header('Accept-Language', 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7')
+            req.add_header('Referer', f'https://www.youtube.com/watch?v={video_id}')
+
             # Ajouter les cookies si disponibles
             if cookies_path and Path(cookies_path).exists():
                 # Lire les cookies depuis le fichier Netscape
@@ -168,8 +174,19 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
             else:
                 response = urllib.request.urlopen(req, timeout=10)
 
-            # Lire et parser le JSON
-            sub_data = json.loads(response.read().decode('utf-8'))
+            # Lire la réponse
+            response_text = response.read().decode('utf-8')
+
+            # Debug: afficher le début de la réponse
+            print(f"   📄 Réponse (premiers 100 chars): {response_text[:100]}")
+
+            # Vérifier que c'est bien du JSON
+            if not response_text or not response_text.strip().startswith('{'):
+                print(f"   ❌ Réponse invalide (pas du JSON) pour '{lang}'")
+                continue
+
+            # Parser le JSON
+            sub_data = json.loads(response_text)
 
             # Vérifier que ce n'est pas vide
             if not sub_data or 'events' not in sub_data or not sub_data['events']:

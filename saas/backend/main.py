@@ -239,9 +239,9 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 30
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
 
-        # Télécharger la vidéo (utilise automatiquement le Cookie Pool)
+        # Télécharger la vidéo (mode public, sans cookies)
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video, cookies_path=None)  # None = utilise le pool
+        download_video(video_url, temp_video, cookies_path=None)  # None = mode public
 
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
@@ -257,7 +257,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             jobs_db[job_id]["progress"] = progress
             jobs_db[job_id]["message"] = message
 
-        # Créer le short avec pipeline rapide (utilise automatiquement le Cookie Pool)
+        # Créer le short avec pipeline rapide (mode public)
         create_short_video_fast(
             input_video=temp_video,
             output_path=str(output_path),
@@ -265,7 +265,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             progress_callback=update_progress,
             youtube_url=video_url,
             transcription_mode=transcription_mode,
-            cookies_path=None  # None = utilise le pool automatiquement
+            cookies_path=None  # None = mode public, sans cookies
         )
 
         # Nettoyer les fichiers temporaires

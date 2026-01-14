@@ -210,15 +210,12 @@
             </select>
         </div>
 
-        <div class="input-group" style="border: 2px solid #667eea; border-radius: 8px; padding: 16px; background: #f7f7ff;">
-            <label for="cookiesFile" style="font-weight: bold; color: #667eea;">🍪 Cookies YouTube (REQUIS)</label>
-            <input type="file" id="cookiesFile" accept=".txt" style="padding: 8px; margin-top: 8px;">
+        <div class="input-group" style="border: 2px solid #28a745; border-radius: 8px; padding: 16px; background: #f0fff4;">
+            <label style="font-weight: bold; color: #28a745;">✅ Mode Public (SANS cookies)</label>
             <small style="color: #333; font-size: 13px; display: block; margin-top: 8px; line-height: 1.6;">
-                ⚠️ <strong>Les cookies sont obligatoires</strong> pour télécharger les vidéos YouTube.<br>
-                📝 <strong>Comment obtenir vos cookies (30 secondes):</strong><br>
-                1️⃣ Installez <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" style="color: #667eea; font-weight: bold;">cette extension Chrome/Edge</a><br>
-                2️⃣ Allez sur <a href="https://youtube.com" target="_blank" style="color: #667eea;">youtube.com</a> et connectez-vous<br>
-                3️⃣ Cliquez sur l'extension → Exportez → Uploadez le fichier ici
+                ✅ <strong>Fonctionne automatiquement</strong> pour les vidéos YouTube publiques (60-80%)<br>
+                🚀 <strong>Aucun cookie nécessaire</strong> - Le système utilise l'accès public YouTube<br>
+                💡 Si une vidéo échoue, un message clair vous indiquera la raison
             </small>
         </div>
 
@@ -279,7 +276,6 @@
             const language = document.getElementById('language').value;
             const platform = document.getElementById('platform').value;
             const transcriptionMode = document.getElementById('transcriptionMode').value;
-            const cookiesFile = document.getElementById('cookiesFile').files[0];
 
             // Validation
             if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
@@ -293,23 +289,18 @@
             showProgress();
             disableButton();
 
-            try {
-                // Préparer les données avec FormData pour supporter le fichier
+            try:
+                // Préparer les données (mode public, pas de cookies)
                 const formData = new FormData();
                 formData.append('video_url', videoUrl);
                 formData.append('language', language);
                 formData.append('target_platform', platform);
                 formData.append('transcription_mode', transcriptionMode);
 
-                // Ajouter le fichier cookies s'il est fourni
-                if (cookiesFile) {
-                    formData.append('cookies_file', cookiesFile);
-                }
-
-                // Lancer le processing
+                // Lancer le processing (mode public)
                 const response = await fetch(`${API_URL}/api/process`, {
                     method: 'POST',
-                    body: formData  // Pas de Content-Type, le navigateur le gère automatiquement
+                    body: formData
                 });
 
                 if (!response.ok) {

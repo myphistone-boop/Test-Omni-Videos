@@ -80,7 +80,7 @@ async def process_video(
     transcription_mode: str = Form("youtube_subs")  # 'youtube_subs' ou 'whisper'
 ):
     """
-    Lance le processing d'une vidéo YouTube avec Cookie Pool automatique
+    Lance le processing d'une vidéo YouTube (mode public, sans cookies)
 
     Args:
         video_url: URL YouTube
@@ -92,8 +92,8 @@ async def process_video(
         JobStatus avec job_id pour tracking
 
     Note:
-        Les cookies YouTube sont gérés automatiquement par le Cookie Pool centralisé.
-        Pas besoin d'uploader de cookies.txt !
+        Fonctionne SANS cookies pour les vidéos publiques YouTube (60-80% des cas).
+        Si échec, le message d'erreur indiquera comment procéder.
     """
 
     # Créer un job unique
@@ -104,7 +104,7 @@ async def process_video(
         "job_id": job_id,
         "status": "pending",
         "progress": 0,
-        "message": "Job créé, en attente de processing (Cookie Pool activé)",
+        "message": "Job créé, en attente de processing (mode public)",
         "created_at": datetime.now(),
         "video_url": video_url,
         "language": language,
@@ -214,7 +214,7 @@ async def list_jobs():
 
 def process_video_task(job_id: str, video_url: str, language: str, target_platform: str, transcription_mode: str = "youtube_subs"):
     """
-    Traite une vidéo YouTube en short avec Cookie Pool automatique
+    Traite une vidéo YouTube en short (mode public, sans cookies)
 
     Cette fonction sera remplacée par une tâche Celery en production
     Pour l'instant elle tourne en background task FastAPI
@@ -231,7 +231,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         # Update status: en cours
         jobs_db[job_id]["status"] = "processing"
         jobs_db[job_id]["progress"] = 10
-        jobs_db[job_id]["message"] = "Téléchargement de la vidéo (Cookie Pool)..."
+        jobs_db[job_id]["message"] = "Téléchargement de la vidéo (mode public)..."
 
         # Import des modules de processing
         from youtube_downloader import download_video

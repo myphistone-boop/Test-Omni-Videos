@@ -198,6 +198,11 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
                 print(f"✅ {len(transcript_words)} mots transcrits (timestamps ajustés: {segment_start:.1f}s - {segment_end:.1f}s)")
 
+                # DEBUG: Afficher quelques mots pour vérifier les timestamps
+                if transcript_words:
+                    print(f"   🔍 DEBUG - Premier mot: '{transcript_words[0]['word']}' @ {transcript_words[0]['start']:.1f}s")
+                    print(f"   🔍 DEBUG - Dernier mot: '{transcript_words[-1]['word']}' @ {transcript_words[-1]['start']:.1f}s")
+
     if transcription_mode == "whisper" or (transcript_words is None and transcription_mode == "whisper"):
         # MODE 3: Whisper API complet (PAYANT mais FIABLE - FALLBACK)
         if generator is None:
@@ -256,9 +261,11 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         print("\n" + "=" * 80)
         print("✨ UTILISATION DU SEGMENT AUDIO-VISUEL")
         print("=" * 80)
-        print(f"Segment : {int(debut_segment)}s → {int(fin_segment)}s")
+        print(f"Segment : {int(debut_segment)}s → {int(fin_segment)}s (durée: {int(fin_segment - debut_segment)}s)")
         print(f"Score : {best_segment['final_score']:.2f}")
         print(f"Raison : {best_segment.get('whisper_gpt_reason', best_segment.get('reason', 'N/A'))}")
+        print(f"🔍 DEBUG - best_segment original: start={best_segment['start']:.1f}s, end={best_segment['end']:.1f}s")
+        print(f"🔍 DEBUG - duree_souhaitee={duree_souhaitee}s, duree_totale={duree_totale:.1f}s")
         print("")
     else:
         # MODE CLASSIQUE: Détection moments forts depuis transcription
@@ -321,6 +328,8 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
     # Étape 5: Filtrer la transcription pour ce segment uniquement
     print("\n📝 Génération des sous-titres (segment uniquement)...")
+    print(f"🔍 DEBUG - Filtrage des mots entre {debut_segment:.1f}s et {fin_segment:.1f}s")
+    print(f"🔍 DEBUG - Nombre total de mots transcrits: {len(transcript_words)}")
 
     # Filtrer les mots pour le segment viral sélectionné
     mots_filtres = []
@@ -332,6 +341,14 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
                 'start': mot_dict['start'] - debut_segment,
                 'end': mot_dict['end'] - debut_segment
             })
+
+    print(f"🔍 DEBUG - Nombre de mots après filtrage: {len(mots_filtres)}")
+    if len(mots_filtres) == 0:
+        print(f"⚠️  WARNING - Aucun mot filtré! Les timestamps des mots ne correspondent pas à la plage du segment!")
+        if transcript_words:
+            print(f"   Premier mot transcrit @ {transcript_words[0]['start']:.1f}s")
+            print(f"   Dernier mot transcrit @ {transcript_words[-1]['start']:.1f}s")
+            print(f"   Plage attendue: {debut_segment:.1f}s - {fin_segment:.1f}s")
 
     # Créer le fichier .ass avec les mots filtrés
     ass_path = Path(tempfile.gettempdir()) / f"{video_title}_subtitles.ass"

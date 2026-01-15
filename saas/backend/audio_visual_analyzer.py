@@ -321,7 +321,8 @@ def detect_candidate_segments(audio_features: Dict, video_duration: float, max_c
                 duration = ts - high_energy_start
                 if duration >= 10.0:  # Au moins 10s d'énergie soutenue
                     start = max(0, high_energy_start - 2)
-                    end = min(video_duration, ts + 2)
+                    # IMPORTANT: Limiter la durée du segment à 60s max
+                    end = min(video_duration, ts + 2, start + 60)
 
                     # Score = durée normalisée
                     audio_score = min(1.0, duration / 30.0)

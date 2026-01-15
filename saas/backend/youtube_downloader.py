@@ -289,8 +289,29 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
                 traceback.print_exc()
                 continue
 
-    print("\n❌ Aucun sous-titre trouvé dans aucune langue testée")
-    print(f"   Langues essayées: {lang_variants}")
+    print("\n" + "="*70)
+    print("❌ AUCUN SOUS-TITRE TROUVÉ")
+    print("="*70)
+    print(f"📝 Langue demandée: {language}")
+    print(f"🔍 Variantes testées: {', '.join(lang_variants)}")
+    print(f"🎯 Types testés: manuel + auto-généré")
+    print("")
+    print("💡 Raisons possibles:")
+    print("   • La vidéo n'a pas de sous-titres dans cette langue")
+    print("   • Les sous-titres sont désactivés par le créateur")
+    print("   • La vidéo est trop récente (sous-titres pas encore générés)")
+    print("   • La vidéo est privée/restreinte")
+    print("")
+    if language == 'fr':
+        print("💬 Message utilisateur:")
+        print("   ⚠️ Aucun sous-titre français trouvé pour cette vidéo.")
+        print("   Les sous-titres YouTube ne sont pas disponibles en français.")
+        print("   Vous pouvez réessayer avec une autre vidéo ou utiliser le mode Whisper (payant).")
+    else:
+        print("💬 Message utilisateur:")
+        print(f"   ⚠️ Aucun sous-titre {language.upper()} trouvé pour cette vidéo.")
+        print(f"   Les sous-titres YouTube ne sont pas disponibles dans cette langue.")
+    print("="*70 + "\n")
 
     return None
 

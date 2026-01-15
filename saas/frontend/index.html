@@ -618,11 +618,14 @@
                 infoEl.textContent = '';
             }
 
-            // Show/hide upload section
-            if (status === 'invalid' || status === 'missing') {
-                uploadSection.style.display = 'block';
+            // Always show upload section, but change button text
+            uploadSection.style.display = 'block';
+
+            const uploadBtn = uploadSection.querySelector('.cookie-upload-btn');
+            if (status === 'ok' || status === 'warning') {
+                uploadBtn.textContent = '🔄 Changer le cookie';
             } else {
-                uploadSection.style.display = 'none';
+                uploadBtn.textContent = '📤 Uploader un cookie YouTube';
             }
         }
 

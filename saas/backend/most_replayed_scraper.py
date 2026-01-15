@@ -52,9 +52,38 @@ def parse_netscape_cookies(cookie_file: str):
     return cookies
 
 
+def parse_svg_path(path_data: str):
+    """
+    Parse le path SVG du heatmap YouTube
+
+    Args:
+        path_data: Attribut 'd' du path SVG (ex: "M5.0,95.2 C...")
+
+    Returns:
+        list[(x, y)]: Liste de coordonnées
+    """
+    coordinates = []
+
+    # Extraire tous les nombres du path
+    import re
+    numbers = re.findall(r'[-+]?\d*\.?\d+', path_data)
+
+    # Grouper par paires (x, y)
+    for i in range(0, len(numbers) - 1, 2):
+        try:
+            x = float(numbers[i])
+            y = float(numbers[i + 1])
+            coordinates.append((x, y))
+        except:
+            continue
+
+    return coordinates
+
+
 def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless: bool = True):
     """
     Récupère les moments les plus replays d'une vidéo YouTube
+    Méthode: Parse le SVG heatmap dans le DOM
 
     Args:
         video_url: URL de la vidéo YouTube
@@ -120,92 +149,146 @@ def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless:
 
             # Attendre que le player se charge
             print("⏳ [STEP 5] Attente du chargement du player...")
-            wait_time = random.randint(3, 5)
-            time.sleep(wait_time)
+            time.sleep(5)
 
-            print("🔍 [STEP 6] Extraction des données YouTube...")
-
-            # Récupérer ytInitialPlayerResponse (contient les heatmap data)
-            player_response = page.evaluate('''() => {
-                try {
-                    return window.ytInitialPlayerResponse || null;
-                } catch(e) {
-                    return null;
-                }
+            # Récupérer la durée de la vidéo
+            print("📊 [STEP 6] Extraction des infos vidéo...")
+            video_info = page.evaluate('''() => {
+                const response = window.ytInitialPlayerResponse;
+                if (!response) return null;
+                return {
+                    title: response.videoDetails?.title || 'Unknown',
+                    duration: parseInt(response.videoDetails?.lengthSeconds || 0)
+                };
             }''')
 
-            # Récupérer ytInitialData (données additionnelles)
-            initial_data = page.evaluate('''() => {
-                try {
-                    return window.ytInitialData || null;
-                } catch(e) {
-                    return null;
-                }
-            }''')
+            if video_info:
+                print(f"   📹 Titre: {video_info['title']}")
+                print(f"   ⏱️  Durée: {video_info['duration']}s")
+                video_duration = video_info['duration']
+            else:
+                print("   ⚠️  Impossible de récupérer les infos vidéo")
+                video_duration = 0
 
-            print("📊 [STEP 7] Parsing des moments les plus replays...")
+            # Chercher le SVG heatmap dans le DOM
+            print("🔍 [STEP 7] Recherche du SVG heatmap...")
+            print("   → Hover sur la barre de progression pour déclencher le SVG...")
+
+            # Hover sur la progress bar pour faire apparaître le heatmap
+            try:
+                # Trouver la progress bar
+                progress_bar = page.locator('.ytp-progress-bar-container').first
+                if progress_bar:
+                    print("   ✅ Progress bar trouvée")
+                    # Hover dessus pour déclencher le SVG
+                    progress_bar.hover()
+                    time.sleep(2)
+                    print("   ✅ Hover effectué")
+            except Exception as e:
+                print(f"   ⚠️  Impossible de hover: {e}")
+
+            # Extraire le SVG path
+            print("📊 [STEP 8] Extraction du SVG path...")
+            svg_path_data = page.evaluate('''() => {
+                const svg = document.querySelector('svg.ytp-heat-map-svg');
+                if (!svg) return null;
+
+                const path = svg.querySelector('path.ytp-heat-map-path');
+                if (!path) return null;
+
+                return path.getAttribute('d');
+            }''')
 
             moments = []
 
-            # Parser les heatmap markers (YouTube stocke ça dans playerResponse)
-            if player_response:
-                try:
-                    # Chercher dans videoDetails
-                    video_details = player_response.get('videoDetails', {})
-                    video_title = video_details.get('title', 'Unknown')
-                    duration = int(video_details.get('lengthSeconds', 0))
+            if svg_path_data:
+                print(f"   ✅ SVG path trouvé ({len(svg_path_data)} caractères)")
+                print(f"   📐 Début du path: {svg_path_data[:100]}...")
 
-                    print(f"   📹 Titre: {video_title}")
-                    print(f"   ⏱️  Durée: {duration}s")
+                # Parser les coordonnées
+                print("🔢 [STEP 9] Parsing des coordonnées...")
+                coordinates = parse_svg_path(svg_path_data)
+                print(f"   ✅ {len(coordinates)} coordonnées extraites")
 
-                    # Chercher les heatmap markers
-                    # Peut être dans : playerResponse.playerConfig.decoratedPlayerBarRenderer.decoratedPlayerBarRenderer.playerBar.multiMarkersPlayerBarRenderer.markersMap
-                    decorations = player_response.get('playerConfig', {}).get('decoratedPlayerBarRenderer', {})
-                    player_bar = decorations.get('decoratedPlayerBarRenderer', {}).get('playerBar', {})
-                    multi_markers = player_bar.get('multiMarkersPlayerBarRenderer', {})
-                    markers_map = multi_markers.get('markersMap', [])
+                if coordinates and video_duration > 0:
+                    # Filtrer pour prendre seulement les points de données (x se termine par .0 ou .5)
+                    # et convertir en moments
+                    print("📊 [STEP 10] Conversion en moments...")
 
-                    print(f"   🔍 Markers trouvés : {len(markers_map)} catégories")
+                    # Détecter les pics (y faible = intensité élevée car axe inversé)
+                    threshold = 80  # Seulement les moments avec y < 80 (intensité > 20%)
+                    peaks = []
 
-                    for marker_category in markers_map:
-                        # Chercher spécifiquement "HEATMAP"
-                        key = marker_category.get('key', '')
+                    for i, (x, y) in enumerate(coordinates):
+                        # Convertir x en position temporelle (0-1)
+                        time_position = (x - 5) / 1000 if x >= 5 else 0
+                        # Convertir y en intensité (100-y car axe inversé)
+                        intensity = (100 - y) / 100
 
-                        if 'HEATMAP' in key or 'MOST_REPLAYED' in key:
-                            print(f"   ✅ Heatmap trouvée dans : {key}")
+                        # Ne garder que les pics significatifs
+                        if y < threshold and time_position >= 0 and time_position <= 1:
+                            timestamp = time_position * video_duration
+                            peaks.append({
+                                'timestamp': timestamp,
+                                'intensity': intensity
+                            })
 
-                            # Extraire les markers
-                            value = marker_category.get('value', {})
-                            heatmap = value.get('heatmap', {})
-                            heatmap_renderer = heatmap.get('heatMapRenderer', {}) or heatmap.get('heatmapRenderer', {})
-                            heat_markers = heatmap_renderer.get('heatMarkers', [])
+                    print(f"   🔍 {len(peaks)} pics détectés (seuil: y < {threshold})")
 
-                            print(f"   📍 {len(heat_markers)} marqueurs de chaleur trouvés")
+                    # Grouper les pics consécutifs en segments
+                    if peaks:
+                        current_segment = None
+                        min_gap = 5  # Secondes minimum entre segments
 
-                            for marker in heat_markers:
-                                # marker contient : timeRangeStartMillis, heatMarkerRenderer
-                                start_ms = marker.get('timeRangeStartMillis', 0)
-                                heat_marker_renderer = marker.get('heatMarkerRenderer', {})
-                                duration_ms = heat_marker_renderer.get('markerDurationMillis', 0)
-                                heat_marker_intensity = heat_marker_renderer.get('heatMarkerIntensityScoreNormalized', 0)
+                        for peak in peaks:
+                            if current_segment is None:
+                                current_segment = {
+                                    'start': peak['timestamp'],
+                                    'end': peak['timestamp'],
+                                    'max_intensity': peak['intensity']
+                                }
+                            elif peak['timestamp'] - current_segment['end'] <= min_gap:
+                                # Étendre le segment
+                                current_segment['end'] = peak['timestamp']
+                                current_segment['max_intensity'] = max(
+                                    current_segment['max_intensity'],
+                                    peak['intensity']
+                                )
+                            else:
+                                # Nouveau segment
+                                if current_segment['end'] - current_segment['start'] >= 5:  # Au moins 5s
+                                    moments.append({
+                                        'start': current_segment['start'],
+                                        'end': current_segment['end'],
+                                        'score': current_segment['max_intensity']
+                                    })
+                                current_segment = {
+                                    'start': peak['timestamp'],
+                                    'end': peak['timestamp'],
+                                    'max_intensity': peak['intensity']
+                                }
 
-                                start_sec = int(start_ms) / 1000.0
-                                end_sec = start_sec + (int(duration_ms) / 1000.0)
-                                score = float(heat_marker_intensity)
+                        # Ajouter le dernier segment
+                        if current_segment and current_segment['end'] - current_segment['start'] >= 5:
+                            moments.append({
+                                'start': current_segment['start'],
+                                'end': current_segment['end'],
+                                'score': current_segment['max_intensity']
+                            })
 
-                                moments.append({
-                                    'start': start_sec,
-                                    'end': end_sec,
-                                    'score': score
-                                })
+                    print(f"   ✅ {len(moments)} moments extraits")
+                    for i, m in enumerate(moments[:5]):  # Afficher les 5 premiers
+                        print(f"      • {m['start']:.1f}s - {m['end']:.1f}s (score: {m['score']:.2f})")
 
-                                print(f"      • {start_sec:.1f}s - {end_sec:.1f}s (score: {score:.2f})")
-
-                except Exception as e:
-                    print(f"   ⚠️  Erreur parsing playerResponse: {e}")
+            else:
+                print("   ❌ Aucun SVG heatmap trouvé dans la page")
+                print("   💡 Raisons possibles:")
+                print("      - La vidéo n'a pas assez de vues (< 90k)")
+                print("      - La vidéo est trop récente (< 5-7 jours)")
+                print("      - YouTube n'a pas généré de heatmap")
 
             # Fermer
-            print("🔒 [STEP 8] Fermeture du navigateur...")
+            print("🔒 [STEP 11] Fermeture du navigateur...")
             page.close()
             context.close()
             browser.close()
@@ -220,9 +303,9 @@ def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless:
             else:
                 print("⚠️  AUCUN moment trouvé")
                 print("💡 Raisons possibles :")
-                print("   - La vidéo n'a pas assez de vues")
+                print("   - La vidéo n'a pas assez de vues (< 90k)")
+                print("   - La vidéo est trop récente (< 5-7 jours)")
                 print("   - YouTube n'a pas généré de heatmap pour cette vidéo")
-                print("   - La structure des données YouTube a changé")
             print("=" * 70)
             print("")
 
@@ -234,6 +317,8 @@ def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless:
         print("❌ ÉCHEC")
         print("=" * 70)
         print(f"Erreur : {str(e)}")
+        import traceback
+        traceback.print_exc()
         print("")
         return None
 

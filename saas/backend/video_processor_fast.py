@@ -181,12 +181,13 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
                 transcript = generator.transcrire_avec_whisper(segment_audio_path, video_title)
 
                 # Convertir au format unifié
+                # IMPORTANT: Ajuster les timestamps pour qu'ils soient relatifs à la vidéo complète
                 transcript_words = []
                 for mot in transcript.words:
                     transcript_words.append({
                         'word': mot.word,
-                        'start': mot.start,
-                        'end': mot.end
+                        'start': mot.start + segment_start,  # Ajuster au temps absolu
+                        'end': mot.end + segment_start       # Ajuster au temps absolu
                     })
 
                 # Nettoyer
@@ -195,7 +196,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
                 except:
                     pass
 
-                print(f"✅ {len(transcript_words)} mots transcrits")
+                print(f"✅ {len(transcript_words)} mots transcrits (timestamps ajustés: {segment_start:.1f}s - {segment_end:.1f}s)")
 
     if transcription_mode == "whisper" or (transcript_words is None and transcription_mode == "whisper"):
         # MODE 3: Whisper API complet (PAYANT mais FIABLE - FALLBACK)

@@ -238,7 +238,7 @@ async def list_jobs():
 # WORKER FUNCTION (à déplacer vers Celery)
 # ==========================================
 
-def process_video_task(job_id: str, video_url: str, language: str, target_platform: str, transcription_mode: str = "youtube_subs"):
+def process_video_task(job_id: str, video_url: str, language: str, target_platform: str, transcription_mode: str = "youtube_subs", cookies_path: str = None):
     """
     Traite une vidéo YouTube en short avec Cookie Pool automatique
 
@@ -251,6 +251,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         language: Langue (fr/en)
         target_platform: Plateforme cible
         transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
+        cookies_path: Chemin vers le fichier cookies (optionnel)
     """
 
     try:
@@ -265,9 +266,9 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["progress"] = 30
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
 
-        # Télécharger la vidéo (utilise automatiquement le Cookie Pool)
+        # Télécharger la vidéo (utilise cookies uploadés ou Cookie Pool)
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video, cookies_path=None)  # None = utilise le pool
+        download_video(video_url, temp_video, cookies_path=cookies_path)
 
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."
@@ -283,7 +284,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             jobs_db[job_id]["progress"] = progress
             jobs_db[job_id]["message"] = message
 
-        # Créer le short avec pipeline rapide (utilise automatiquement le Cookie Pool)
+        # Créer le short avec pipeline rapide (utilise cookies uploadés ou Cookie Pool)
         create_short_video_fast(
             input_video=temp_video,
             output_path=str(output_path),
@@ -291,7 +292,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             progress_callback=update_progress,
             youtube_url=video_url,
             transcription_mode=transcription_mode,
-            cookies_path=None  # None = utilise le pool automatiquement
+            cookies_path=cookies_path
         )
 
         # Nettoyer les fichiers temporaires

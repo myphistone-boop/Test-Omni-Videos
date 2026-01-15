@@ -182,7 +182,90 @@ Pour tester, utilisez des vidéos **très populaires** (> 1M de vues, > 1 mois) 
 1. **Rick Astley - Never Gonna Give You Up** : `dQw4w9WgXcQ`
 2. **Clips musicaux populaires** (> 100M vues)
 
+### Vidéo de test utilisateur :
+
+1. **https://www.youtube.com/watch?v=5Oo0u5RZ7HA** - Confirmé avoir "Most Replayed" à 1:34
+
 **Note** : Les vidéos doivent avoir suffisamment de données de "replay" pour que YouTube génère le heatmap.
+
+## 🐛 Script de debug (IMPORTANT si le scraper ne trouve rien)
+
+Si le scraper retourne "AUCUN moment trouvé" mais que vous voyez le heatmap dans le navigateur, utilisez le script de debug :
+
+### Mode avec navigateur visible (recommandé pour debug)
+
+```bash
+cd /home/shorts/Test-Omni-Videos/saas/backend
+
+venv/bin/python3 debug_heatmap_location.py \
+  "https://www.youtube.com/watch?v=5Oo0u5RZ7HA" \
+  --cookie-file /home/shorts/cookies/account_1.txt
+```
+
+**Sans --headless**, vous verrez le navigateur s'ouvrir et pourrez observer les interactions.
+
+### Ce que le script de debug fait :
+
+1. **Analyse tous les SVG** sur la page principale
+2. **Cherche dans les iframes** (le player YouTube est parfois dans un iframe)
+3. **Teste différentes interactions** (hover, clic, etc.)
+4. **Essaie 7 stratégies différentes** pour localiser le heatmap
+5. **Prend un screenshot** dans `/tmp/youtube_heatmap_debug.png`
+6. **Affiche des infos détaillées** sur tous les éléments trouvés
+
+### Résultat attendu du debug :
+
+```
+======================================================================
+🔍 DEBUG HEATMAP LOCATION
+======================================================================
+URL: https://www.youtube.com/watch?v=5Oo0u5RZ7HA
+
+✅ 23 cookies chargés
+
+⏳ Attente du chargement complet...
+
+======================================================================
+📊 STRATÉGIE 1: Tous les SVG sur la page principale
+======================================================================
+Trouvé 15 SVG sur la page principale:
+  #0: classes='...' id='...' parent=DIV paths=5
+  ...
+
+======================================================================
+📺 STRATÉGIE 2: Chercher dans l'iframe du player YouTube
+======================================================================
+Trouvé 1 iframe(s) sur la page
+  iframe #0: https://www.youtube.com/...
+    → 3 SVG dans cette iframe
+       #0: classes='ytp-heat-map-svg' ...
+
+======================================================================
+🖱️  STRATÉGIE 3: Hover sur la progress bar et attendre
+======================================================================
+  Essai du sélecteur: .ytp-progress-bar-container
+    ✅ Trouvé! Hover...
+    ✅ Hover effectué, attente 3s...
+
+======================================================================
+🔥 STRATÉGIE 4: Chercher le heatmap après hover
+======================================================================
+  Essai du sélecteur: svg.ytp-heat-map-svg
+    ✅ TROUVÉ!
+       Classes: ytp-heat-map-svg
+       Has path: True
+       Path (début): M5.0,95.2 C5.5,94.8 6.0,94.3...
+```
+
+### Si le debug trouve le SVG mais pas le scraper principal :
+
+Cela signifie qu'il faut ajuster les sélecteurs ou les temps d'attente dans `most_replayed_scraper.py`.
+
+### Si le debug ne trouve rien non plus :
+
+1. Vérifier que la vidéo a bien le heatmap dans un navigateur normal
+2. Vérifier que le cookie est valide
+3. La vidéo n'a peut-être pas assez de vues pour générer le heatmap
 
 ## ❌ Problèmes courants
 

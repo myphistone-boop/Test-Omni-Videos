@@ -208,6 +208,93 @@ async def list_jobs():
     return {"jobs": list(jobs_db.values())}
 
 
+@app.get("/api/cookie-status")
+async def get_cookie_status():
+    """
+    Récupère le statut du cookie YouTube serveur
+
+    Returns:
+        {
+            "status": "ok" | "invalid" | "warning" | "missing",
+            "message": "Cookie valide",
+            "last_check": "2026-01-14T10:30:00",
+            "last_success": "2026-01-14T10:30:00",
+            "age_hours": 2.5,
+            "health_score": 100
+        }
+    """
+    try:
+        from cookie_monitor import CookieStatus
+        monitor = CookieStatus()
+        return monitor.get_status()
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Erreur lors de la récupération du statut: {str(e)}",
+            "health_score": 0
+        }
+
+
+@app.post("/api/upload-cookie")
+async def upload_cookie(cookie_file: UploadFile = File(...)):
+    """
+    Upload un nouveau fichier de cookies YouTube
+
+    Args:
+        cookie_file: Fichier cookies.txt au format Netscape
+
+    Returns:
+        {
+            "success": True,
+            "message": "Cookie uploadé avec succès"
+        }
+    """
+    try:
+        from cookie_monitor import CookieStatus, COOKIE_DIR, COOKIE_FILE
+
+        # Vérifier que c'est un fichier .txt
+        if not cookie_file.filename.endswith('.txt'):
+            raise HTTPException(
+                status_code=400,
+                detail="Le fichier doit être au format .txt"
+            )
+
+        # Créer le dossier si nécessaire
+        COOKIE_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Lire le contenu
+        content = await cookie_file.read()
+
+        # Valider que c'est bien un fichier cookie Netscape
+        content_str = content.decode('utf-8')
+        if '# Netscape HTTP Cookie File' not in content_str and 'youtube.com' not in content_str:
+            raise HTTPException(
+                status_code=400,
+                detail="Le fichier ne semble pas être un fichier de cookies YouTube valide"
+            )
+
+        # Sauvegarder le fichier
+        with open(COOKIE_FILE, 'wb') as f:
+            f.write(content)
+
+        # Mettre à jour le statut
+        monitor = CookieStatus()
+        monitor.mark_cookie_created()
+
+        return {
+            "success": True,
+            "message": "Cookie uploadé avec succès et marqué comme actif"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'upload: {str(e)}"
+        )
+
+
 # ==========================================
 # WORKER FUNCTION (à déplacer vers Celery)
 # ==========================================

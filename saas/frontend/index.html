@@ -177,12 +177,151 @@
             font-size: 12px;
             color: #666;
         }
+
+        /* Cookie Status Styles */
+        .cookie-status {
+            margin-bottom: 25px;
+            padding: 16px;
+            border-radius: 8px;
+            border: 2px solid #e1e4e8;
+        }
+
+        .cookie-status.ok {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .cookie-status.invalid {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .cookie-status.warning {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+
+        .cookie-status.missing {
+            border-color: #6c757d;
+            background: #f8f9fa;
+        }
+
+        .cookie-status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .cookie-status-title {
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        .cookie-status.ok .cookie-status-title {
+            color: #28a745;
+        }
+
+        .cookie-status.invalid .cookie-status-title {
+            color: #dc3545;
+        }
+
+        .cookie-status.warning .cookie-status-title {
+            color: #ffc107;
+        }
+
+        .cookie-status.missing .cookie-status-title {
+            color: #6c757d;
+        }
+
+        .cookie-status-message {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .cookie-upload-section {
+            display: none;
+        }
+
+        .cookie-upload-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            width: auto;
+            display: inline-block;
+        }
+
+        .cookie-upload-btn:hover {
+            background: #5568d3;
+        }
+
+        .cookie-file-input {
+            display: none;
+        }
+
+        .cookie-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 6px;
+            background: #e1e4e8;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎬 YouTube to Shorts</h1>
         <p class="subtitle">Convertissez n'importe quelle vidéo YouTube en Short viral (9:16 + sous-titres)</p>
+
+        <!-- Cookie Status -->
+        <div id="cookieStatus" class="cookie-status missing">
+            <div class="cookie-status-header">
+                <span class="cookie-status-title">
+                    <span id="cookieStatusIcon">⚙️</span>
+                    <span id="cookieStatusLabel">Chargement...</span>
+                </span>
+            </div>
+            <div class="cookie-status-message" id="cookieStatusMessage">
+                Vérification du statut du système...
+            </div>
+            <div class="health-bar">
+                <div class="health-fill" id="healthFill" style="width: 0%"></div>
+            </div>
+            <div class="cookie-info" id="cookieInfo"></div>
+
+            <!-- Section upload (affichée si cookie invalide) -->
+            <div class="cookie-upload-section" id="cookieUploadSection">
+                <input type="file" id="cookieFileInput" class="cookie-file-input" accept=".txt" onchange="uploadCookie()">
+                <button class="cookie-upload-btn" onclick="document.getElementById('cookieFileInput').click()">
+                    📤 Uploader un cookie YouTube
+                </button>
+                <div class="cookie-info" style="margin-top: 12px;">
+                    💡 Tutoriel :
+                    <a href="#" onclick="showCookieTutorial(); return false;" style="color: #667eea;">
+                        Comment obtenir mes cookies YouTube ?
+                    </a>
+                </div>
+            </div>
+        </div>
 
         <div class="input-group">
             <label for="videoUrl">URL YouTube</label>
@@ -401,6 +540,158 @@
             btn.disabled = false;
             btn.textContent = '🚀 Générer le Short';
         }
+
+        // ===== COOKIE MANAGEMENT =====
+
+        async function checkCookieStatus() {
+            try {
+                const response = await fetch(`${API_URL}/api/cookie-status`);
+                const data = await response.json();
+
+                updateCookieStatusUI(data);
+            } catch (error) {
+                console.error('Erreur lors de la vérification du cookie:', error);
+            }
+        }
+
+        function updateCookieStatusUI(data) {
+            const statusEl = document.getElementById('cookieStatus');
+            const iconEl = document.getElementById('cookieStatusIcon');
+            const labelEl = document.getElementById('cookieStatusLabel');
+            const messageEl = document.getElementById('cookieStatusMessage');
+            const infoEl = document.getElementById('cookieInfo');
+            const healthEl = document.getElementById('healthFill');
+            const uploadSection = document.getElementById('cookieUploadSection');
+
+            // Reset classes
+            statusEl.className = 'cookie-status';
+
+            // Update based on status
+            const status = data.status || 'missing';
+            statusEl.classList.add(status);
+
+            // Icons
+            const icons = {
+                'ok': '🟢',
+                'invalid': '🔴',
+                'warning': '🟡',
+                'missing': '⚙️',
+                'error': '⚠️'
+            };
+
+            iconEl.textContent = icons[status] || '⚙️';
+
+            // Labels
+            const labels = {
+                'ok': 'Cookie valide',
+                'invalid': 'Cookie invalide',
+                'warning': 'Cookie attention',
+                'missing': 'Aucun cookie',
+                'error': 'Erreur système'
+            };
+
+            labelEl.textContent = labels[status] || 'Statut inconnu';
+
+            // Message
+            messageEl.textContent = data.message || 'Aucune information disponible';
+
+            // Health bar
+            const healthScore = data.health_score || 0;
+            healthEl.style.width = `${healthScore}%`;
+
+            // Info supplémentaire
+            if (data.age_hours !== undefined) {
+                const age = data.age_hours < 1
+                    ? `${Math.round(data.age_hours * 60)} min`
+                    : `${Math.round(data.age_hours * 10) / 10} h`;
+
+                const lastCheck = data.last_check
+                    ? new Date(data.last_check).toLocaleString('fr-FR')
+                    : 'Jamais';
+
+                infoEl.innerHTML = `
+                    📊 Score de santé: ${healthScore}/100 |
+                    ⏰ Âge: ${age} |
+                    🔍 Dernière vérif: ${lastCheck}
+                `;
+            } else {
+                infoEl.textContent = '';
+            }
+
+            // Show/hide upload section
+            if (status === 'invalid' || status === 'missing') {
+                uploadSection.style.display = 'block';
+            } else {
+                uploadSection.style.display = 'none';
+            }
+        }
+
+        async function uploadCookie() {
+            const fileInput = document.getElementById('cookieFileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                return;
+            }
+
+            // Vérifier l'extension
+            if (!file.name.endsWith('.txt')) {
+                alert('❌ Le fichier doit être au format .txt');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('cookie_file', file);
+
+            try {
+                // Show loading
+                const uploadSection = document.getElementById('cookieUploadSection');
+                const originalHTML = uploadSection.innerHTML;
+                uploadSection.innerHTML = '<p style="text-align: center;">⏳ Upload en cours...</p>';
+
+                const response = await fetch(`${API_URL}/api/upload-cookie`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert('✅ ' + result.message);
+                    // Refresh status immediately
+                    await checkCookieStatus();
+                } else {
+                    alert('❌ Erreur: ' + (result.detail || result.message || 'Upload échoué'));
+                    uploadSection.innerHTML = originalHTML;
+                }
+
+                // Reset file input
+                fileInput.value = '';
+
+            } catch (error) {
+                alert('❌ Erreur lors de l\'upload: ' + error.message);
+                console.error('Upload error:', error);
+            }
+        }
+
+        function showCookieTutorial() {
+            alert(`📖 Comment obtenir vos cookies YouTube ?\n\n` +
+                  `1️⃣ Ouvrez YouTube.com et connectez-vous\n` +
+                  `2️⃣ Installez l'extension "Get cookies.txt LOCALLY"\n` +
+                  `   Chrome: https://chrome.google.com/webstore (cherchez "cookies.txt")\n` +
+                  `   Firefox: https://addons.mozilla.org (cherchez "cookies.txt")\n\n` +
+                  `3️⃣ Cliquez sur l'icône de l'extension\n` +
+                  `4️⃣ Cliquez sur "Export" pour télécharger cookies.txt\n` +
+                  `5️⃣ Uploadez le fichier ici\n\n` +
+                  `⚠️ IMPORTANT: Après l'upload, NE PLUS utiliser ce compte YouTube\n` +
+                  `   sur d'autres appareils (le serveur devient le seul propriétaire)`);
+        }
+
+        // Check cookie status on page load
+        checkCookieStatus();
+
+        // Poll cookie status every 30 seconds
+        setInterval(checkCookieStatus, 30000);
 
         // Allow Enter key to submit
         document.getElementById('videoUrl').addEventListener('keypress', (e) => {

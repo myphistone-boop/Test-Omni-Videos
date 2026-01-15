@@ -19,15 +19,28 @@ from create_subtitled_video import YouTubeSubtitleGenerator
 
 def create_short_video_fast(input_video: str, output_path: str, language: str = "fr",
                            progress_callback=None, youtube_url: str = None,
-                           transcription_mode: str = "youtube_subs", cookies_path: str = None):
+                           transcription_mode: str = "youtube_subs", cookies_path: str = None,
+                           openai_api_key: str = None):
     """
     Crée un short RAPIDEMENT avec pipeline optimisé
 
-    Pipeline ULTRA-RAPIDE :
-    1. Transcription (YouTube subs OU Whisper)
+    Pipeline ULTRA-RAPIDE (3 modes):
+    MODE 1 - YouTube Subs (gratuit, rapide):
+    1. Sous-titres YouTube → Transcription
     2. EXTRACTION des 60-90s les plus virales
     3. Génération fichier .ass sous-titres (sur 60s seulement)
     4. UNE SEULE PASSE FFmpeg sur 60s : vertical 720p + fond noir + sous-titres
+
+    MODE 2 - Audio-Visual + Whisper (nouveau, intelligent):
+    1. Analyse audio+visuel → 15 candidats temps forts
+    2. TOP 5 → Whisper + GPT scoring
+    3. Meilleur segment → Whisper pour sous-titres
+    4. UNE SEULE PASSE FFmpeg
+
+    MODE 3 - Whisper complet (fallback):
+    1. Transcription Whisper complète
+    2. Détection moments forts
+    3. Génération short
 
     Args:
         input_video: Chemin vers la vidéo source
@@ -35,8 +48,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         language: Langue des sous-titres (fr ou en)
         progress_callback: Fonction optionnelle callback(progress, message)
         youtube_url: URL YouTube (requis si transcription_mode='youtube_subs')
-        transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
+        transcription_mode: Mode de transcription ('youtube_subs', 'audio_visual', ou 'whisper')
         cookies_path: Chemin vers cookies.txt (requis pour YouTube subtitles)
+        openai_api_key: Clé API OpenAI (requis pour modes 'audio_visual' et 'whisper')
 
     Returns:
         str: Chemin du fichier créé
@@ -54,8 +68,9 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
     print(f"⚡ GÉNÉRATEUR ULTRA-RAPIDE - MODE: {transcription_mode.upper()}")
     print("=" * 70)
 
-    # Étape 1 & 2: Obtenir la transcription
+    # Étape 1 & 2: Obtenir la transcription OU utiliser analyse audio-visuelle
     transcript_words = None
+    best_segment = None  # Pour le mode audio_visual
 
     if transcription_mode == "youtube_subs" and youtube_url:
         # MODE 1: Sous-titres YouTube (GRATUIT, ULTRA-RAPIDE)
@@ -69,13 +84,121 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         if transcript_words:
             print(f"✅ {len(transcript_words)} mots récupérés des sous-titres YouTube (gratuit!)")
         else:
-            # MODE DEBUG: PAS DE FALLBACK - On veut voir pourquoi ça échoue!
-            error_msg = "❌ ÉCHEC: Pas de sous-titres YouTube trouvés! Vérifiez les logs ci-dessus pour voir pourquoi."
-            print(error_msg)
-            raise Exception(error_msg)
+            print("⚠️  Pas de sous-titres YouTube, basculement vers mode audio-visuel...")
+            transcription_mode = "audio_visual"  # Fallback automatique
+
+    if transcription_mode == "audio_visual":
+        # MODE 2: Audio-Visual + Whisper sur TOP 5 (INTELLIGENT, RAPIDE, PEU CHER)
+        print("\n" + "=" * 80)
+        print("🎯 MODE AUDIO-VISUEL ACTIVÉ")
+        print("=" * 80)
+        print("")
+
+        if not openai_api_key:
+            raise Exception("Clé API OpenAI requise pour le mode audio-visuel")
+
+        if progress_callback:
+            progress_callback(20, "Analyse audio-visuelle...")
+
+        # Obtenir la durée de la vidéo
+        from moviepy.editor import VideoFileClip
+        video = VideoFileClip(input_video)
+        duree_totale = video.duration
+        video.close()
+
+        # 1. Analyse audio-visuelle
+        from audio_visual_analyzer import analyze_video
+        candidates = analyze_video(input_video, duree_totale)
+
+        if not candidates:
+            print("❌ Aucun candidat détecté par l'analyse audio-visuelle")
+            print("⚠️  Basculement vers Whisper complet...")
+            transcription_mode = "whisper"
+        else:
+            if progress_callback:
+                progress_callback(40, "Validation Whisper des TOP 5 candidats...")
+
+            # 2. Whisper + GPT sur TOP 5
+            from whisper_validator import validate_candidates_with_whisper
+            validated_candidates = validate_candidates_with_whisper(
+                video_path=input_video,
+                candidates=candidates,
+                top_n=5,
+                openai_api_key=openai_api_key,
+                context_seconds=5
+            )
+
+            if not validated_candidates or validated_candidates[0]['final_score'] < 0.3:
+                print("⚠️  Aucun candidat avec score suffisant, basculement vers Whisper complet...")
+                transcription_mode = "whisper"
+            else:
+                # 3. Prendre le meilleur
+                best_segment = validated_candidates[0]
+                print("\n" + "=" * 80)
+                print(f"🏆 MEILLEUR SEGMENT SÉLECTIONNÉ")
+                print("=" * 80)
+                print(f"Segment : {best_segment['start']:.1f}s - {best_segment['end']:.1f}s")
+                print(f"Score final : {best_segment['final_score']:.2f}")
+                print(f"Transcription : '{best_segment.get('whisper_transcription', 'N/A')[:100]}'")
+                print("")
+
+                # 4. Whisper sur ce segment pour les sous-titres
+                if progress_callback:
+                    progress_callback(60, "Génération sous-titres du meilleur segment...")
+
+                # On a déjà la transcription, mais on a besoin du format avec timestamps mot-par-mot
+                # Donc on va re-transcribe avec Whisper le segment choisi
+                if generator is None:
+                    generator = YouTubeSubtitleGenerator()
+
+                # Extraire le segment audio
+                segment_start = best_segment['start']
+                segment_end = min(segment_start + 60, best_segment['end'])  # Max 60s
+
+                print(f"📝 Transcription Whisper du segment {segment_start:.1f}s - {segment_end:.1f}s...")
+
+                # Extraire audio du segment
+                segment_audio_path = str(Path(tempfile.gettempdir()) / f"{video_title}_segment_audio.mp3")
+
+                extract_audio_cmd = [
+                    'ffmpeg', '-y',
+                    '-ss', str(segment_start),
+                    '-i', input_video,
+                    '-t', str(segment_end - segment_start),
+                    '-vn',
+                    '-acodec', 'libmp3lame',
+                    '-ar', '16000',
+                    '-ac', '1',
+                    segment_audio_path
+                ]
+
+                result = subprocess.run(extract_audio_cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    print(f"❌ Erreur extraction audio : {result.stderr}")
+                    raise Exception("Échec extraction audio segment")
+
+                # Transcrire avec Whisper
+                transcript = generator.transcrire_avec_whisper(segment_audio_path, video_title)
+
+                # Convertir au format unifié
+                transcript_words = []
+                for mot in transcript.words:
+                    transcript_words.append({
+                        'word': mot.word,
+                        'start': mot.start,
+                        'end': mot.end
+                    })
+
+                # Nettoyer
+                try:
+                    Path(segment_audio_path).unlink()
+                except:
+                    pass
+
+                print(f"✅ {len(transcript_words)} mots transcrits")
 
     if transcription_mode == "whisper" or (transcript_words is None and transcription_mode == "whisper"):
-        # MODE 2: Whisper API (PAYANT mais FIABLE)
+        # MODE 3: Whisper API complet (PAYANT mais FIABLE - FALLBACK)
         if generator is None:
             generator = YouTubeSubtitleGenerator()
 
@@ -116,14 +239,7 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
     mock_transcript = MockTranscript(transcript_words)
 
-    # Étape 3: NOUVEAUTÉ - Détecter et extraire segment viral (60-90s)
-    print("\n🔥 Détection du segment viral optimal (60-90s)...")
-    if progress_callback:
-        progress_callback(50, "Analyse des moments viraux...")
-
-    moments_forts = generator.detecter_moments_forts_local(mock_transcript, duree_segment=3)
-
-    # Déterminer le meilleur segment de 60-90s
+    # Étape 3: Déterminer le segment à utiliser
     from moviepy.editor import VideoFileClip
     video = VideoFileClip(input_video)
     duree_totale = video.duration
@@ -131,18 +247,38 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
 
     duree_souhaitee = min(60, duree_totale)  # Max 60 secondes
 
-    if moments_forts and duree_totale > duree_souhaitee:
-        # Prendre le moment fort avec le meilleur score
-        meilleur_moment = moments_forts[0]
-        debut_segment = max(0, meilleur_moment['start'] - 5)  # 5s avant le moment fort
-        fin_segment = min(debut_segment + duree_souhaitee, duree_totale)
-        print(f"   ✨ Segment viral trouvé : {int(debut_segment)}s → {int(fin_segment)}s")
-        print(f"   💡 Raison : {meilleur_moment.get('reason', 'N/A')}")
+    if best_segment:
+        # MODE AUDIO-VISUEL: Utiliser le segment sélectionné
+        debut_segment = best_segment['start']
+        fin_segment = min(debut_segment + duree_souhaitee, best_segment['end'])
+
+        print("\n" + "=" * 80)
+        print("✨ UTILISATION DU SEGMENT AUDIO-VISUEL")
+        print("=" * 80)
+        print(f"Segment : {int(debut_segment)}s → {int(fin_segment)}s")
+        print(f"Score : {best_segment['final_score']:.2f}")
+        print(f"Raison : {best_segment.get('whisper_gpt_reason', best_segment.get('reason', 'N/A'))}")
+        print("")
     else:
-        # Prendre le début si pas de moment fort ou vidéo courte
-        debut_segment = 0
-        fin_segment = min(duree_souhaitee, duree_totale)
-        print(f"   📍 Utilisation du début : 0s → {int(fin_segment)}s")
+        # MODE CLASSIQUE: Détection moments forts depuis transcription
+        print("\n🔥 Détection du segment viral optimal (60-90s)...")
+        if progress_callback:
+            progress_callback(50, "Analyse des moments viraux...")
+
+        moments_forts = generator.detecter_moments_forts_local(mock_transcript, duree_segment=3)
+
+        if moments_forts and duree_totale > duree_souhaitee:
+            # Prendre le moment fort avec le meilleur score
+            meilleur_moment = moments_forts[0]
+            debut_segment = max(0, meilleur_moment['start'] - 5)  # 5s avant le moment fort
+            fin_segment = min(debut_segment + duree_souhaitee, duree_totale)
+            print(f"   ✨ Segment viral trouvé : {int(debut_segment)}s → {int(fin_segment)}s")
+            print(f"   💡 Raison : {meilleur_moment.get('reason', 'N/A')}")
+        else:
+            # Prendre le début si pas de moment fort ou vidéo courte
+            debut_segment = 0
+            fin_segment = min(duree_souhaitee, duree_totale)
+            print(f"   📍 Utilisation du début : 0s → {int(fin_segment)}s")
 
     # Étape 4: Extraire le segment viral AVANT traitement
     print(f"\n✂️  Extraction du segment ({int(fin_segment - debut_segment)}s)...")

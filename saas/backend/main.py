@@ -352,7 +352,8 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             progress_callback=update_progress,
             youtube_url=video_url,
             transcription_mode=transcription_mode,
-            cookies_path=None  # None = mode public, sans cookies
+            cookies_path=None,  # None = mode public, sans cookies
+            openai_api_key=os.environ.get('OPENAI_API_KEY')  # Pour mode audio_visual
         )
 
         # Nettoyer les fichiers temporaires

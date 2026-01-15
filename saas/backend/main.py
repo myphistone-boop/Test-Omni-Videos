@@ -328,10 +328,26 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
 
         # Télécharger la vidéo (mode public, sans cookies)
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video, cookies_path=None)  # None = mode public
+        download_failed = False
+
+        try:
+            download_video(video_url, temp_video, cookies_path=None)  # None = mode public
+        except Exception as download_error:
+            download_error_str = str(download_error)
+            print(f"⚠️  Échec download initial : {download_error_str}")
+
+            # Si c'est une détection de bot, basculer vers audio-visual
+            if "bot" in download_error_str.lower() or "sign in" in download_error_str.lower():
+                print(f"🤖 Détection de bot YouTube → Basculement vers mode audio-visuel")
+                download_failed = True
+                transcription_mode = "audio_visual"
+                jobs_db[job_id]["message"] = "YouTube a détecté un bot, passage en mode intelligent..."
+            else:
+                # Autre erreur, on la propage
+                raise
 
         jobs_db[job_id]["progress"] = 50
-        jobs_db[job_id]["message"] = "Génération des sous-titres..."
+        jobs_db[job_id]["message"] = "Génération des sous-titres..." if not download_failed else "Analyse audio-visuelle intelligente..."
 
         # Importer le video processor RAPIDE (pipeline optimisé)
         from video_processor_fast import create_short_video_fast
@@ -343,6 +359,27 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
             """Callback pour mettre à jour la progression en temps réel"""
             jobs_db[job_id]["progress"] = progress
             jobs_db[job_id]["message"] = message
+
+        # Si le download a échoué (mode audio_visual), télécharger avec yt-dlp basique
+        if download_failed:
+            print(f"📥 Téléchargement avec yt-dlp en mode basique (sans cookies)...")
+            jobs_db[job_id]["message"] = "Téléchargement vidéo (mode alternatif)..."
+
+            import subprocess
+            yt_dlp_cmd = [
+                'yt-dlp',
+                '-f', 'best[height<=720]',  # Max 720p pour vitesse
+                '-o', temp_video,
+                '--no-warnings',
+                '--quiet',
+                video_url
+            ]
+
+            result = subprocess.run(yt_dlp_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Impossible de télécharger la vidéo : {result.stderr}")
+
+            print(f"✅ Vidéo téléchargée en mode alternatif")
 
         # Créer le short avec pipeline rapide (mode public)
         create_short_video_fast(

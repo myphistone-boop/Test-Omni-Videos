@@ -42,7 +42,12 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         str: Chemin du fichier créé
     """
 
-    generator = YouTubeSubtitleGenerator()
+    # N'instancier YouTubeSubtitleGenerator QUE si on utilise Whisper
+    # (car cette classe vérifie la clé OpenAI à l'initialisation)
+    generator = None
+    if transcription_mode == "whisper":
+        generator = YouTubeSubtitleGenerator()
+
     video_title = Path(input_video).stem
 
     print("\n" + "=" * 70)
@@ -69,8 +74,11 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
             print(error_msg)
             raise Exception(error_msg)
 
-    if transcription_mode == "whisper" or transcript_words is None:
+    if transcription_mode == "whisper" or (transcript_words is None and transcription_mode == "whisper"):
         # MODE 2: Whisper API (PAYANT mais FIABLE)
+        if generator is None:
+            generator = YouTubeSubtitleGenerator()
+
         print("\n🎵 Extraction de l'audio...")
         if progress_callback:
             progress_callback(35, "Extraction audio...")

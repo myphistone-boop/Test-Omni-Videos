@@ -68,15 +68,21 @@ echo -e "${BLUE}[STEP 6]${NC} Starting backend with gunicorn (using venv)..."
 echo "=========================================="
 cd "$BACKEND_DIR"
 
-# Start gunicorn in background (same command as before)
+# Start gunicorn in background
+# TOUT va dans un seul fichier : /home/shorts/shorts-backend-full.log
+FULL_LOG="/home/shorts/shorts-backend-full.log"
+> "$FULL_LOG"  # Clear log
+
 nohup "$VENV_DIR/bin/gunicorn" main:app \
     -w 1 \
     -k uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:8000 \
     --timeout 300 \
-    --access-logfile "$LOG_FILE" \
-    --error-logfile "$ERROR_LOG" \
-    > /dev/null 2>&1 &
+    --log-level debug \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output \
+    > "$FULL_LOG" 2>&1 &
 
 BACKEND_PID=$!
 echo -e "${GREEN}✅ Backend started with PID: $BACKEND_PID${NC}"
@@ -134,13 +140,11 @@ echo -e "${GREEN}✅ BACKEND RESTARTED${NC}"
 echo "=========================================="
 echo ""
 echo "Backend PID: $ACTUAL_PID"
-echo "Access log: $LOG_FILE"
-echo "Error log: $ERROR_LOG"
+echo "Full log: $FULL_LOG"
 echo "Virtualenv: $VENV_DIR"
 echo ""
-echo "Monitor logs:"
-echo "  tail -f $LOG_FILE"
-echo "  tail -f $ERROR_LOG"
+echo "🔍 VOIR TOUS LES LOGS EN TEMPS RÉEL:"
+echo "  tail -f $FULL_LOG"
 echo ""
 echo "Stop backend:"
 echo "  pkill -f 'gunicorn.*main:app'"

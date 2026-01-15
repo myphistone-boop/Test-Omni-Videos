@@ -41,6 +41,10 @@ import tempfile
 OUTPUT_DIR = Path(tempfile.gettempdir()) / "shorts_output"
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
+# Sessions directory for cookies
+SESSIONS_DIR = Path(tempfile.gettempdir()) / "shorts_sessions"
+SESSIONS_DIR.mkdir(exist_ok=True, parents=True)
+
 
 class VideoRequest(BaseModel):
     """Request pour traiter une vidéo"""
@@ -77,39 +81,60 @@ async def process_video(
     video_url: str = Form(...),
     language: str = Form("fr"),
     target_platform: str = Form("tiktok"),
-    transcription_mode: str = Form("youtube_subs")  # 'youtube_subs' ou 'whisper'
+    transcription_mode: str = Form("youtube_subs"),  # 'youtube_subs' ou 'whisper'
+    cookies_file: Optional[UploadFile] = File(None)  # Cookies optionnels
 ):
     """
-    Lance le processing d'une vidéo YouTube avec Cookie Pool automatique
+    Lance le processing d'une vidéo YouTube
 
     Args:
         video_url: URL YouTube
         language: Langue (fr/en)
         target_platform: Plateforme cible
         transcription_mode: Mode de transcription ('youtube_subs' ou 'whisper')
+        cookies_file: Fichier cookies.txt (optionnel, seulement pour vidéos restreintes)
 
     Returns:
         JobStatus avec job_id pour tracking
 
     Note:
-        Les cookies YouTube sont gérés automatiquement par le Cookie Pool centralisé.
-        Pas besoin d'uploader de cookies.txt !
+        Les cookies sont OPTIONNELS. La plupart des vidéos publiques fonctionnent sans.
+        Uploadez des cookies seulement si vous avez une erreur de restriction.
     """
 
     # Créer un job unique
     job_id = str(uuid.uuid4())
 
-    # Initialiser le job (plus besoin de cookies_path)
+    # Sauvegarder le fichier cookies si fourni
+    cookies_path = None
+    if cookies_file:
+        # Créer répertoire pour ce job
+        job_session_dir = SESSIONS_DIR / job_id
+        job_session_dir.mkdir(exist_ok=True)
+
+        # Sauvegarder les cookies
+        cookies_path = job_session_dir / "youtube_cookies.txt"
+        with open(cookies_path, "wb") as f:
+            content = await cookies_file.read()
+            f.write(content)
+
+        # Permissions restrictives
+        os.chmod(cookies_path, 0o600)
+
+        print(f"✅ Cookies uploadés pour job {job_id}: {cookies_path}")
+
+    # Initialiser le job
     jobs_db[job_id] = {
         "job_id": job_id,
         "status": "pending",
         "progress": 0,
-        "message": "Job créé, en attente de processing (Cookie Pool activé)",
+        "message": "Job créé, en attente de processing" + (" (avec cookies)" if cookies_path else " (sans cookies)"),
         "created_at": datetime.now(),
         "video_url": video_url,
         "language": language,
         "target_platform": target_platform,
-        "transcription_mode": transcription_mode
+        "transcription_mode": transcription_mode,
+        "cookies_path": str(cookies_path) if cookies_path else None
     }
 
     # Lancer le processing en background
@@ -119,7 +144,8 @@ async def process_video(
         video_url,
         language,
         target_platform,
-        transcription_mode
+        transcription_mode,
+        str(cookies_path) if cookies_path else None
     )
 
     return JobStatus(**jobs_db[job_id])

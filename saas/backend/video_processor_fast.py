@@ -302,10 +302,18 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         segment_path
     ]
 
-    result = subprocess.run(extract_cmd, capture_output=True, text=True)
+    print(f"   ▶️  Extraction du segment avec FFmpeg (peut prendre 5-15s)...")
+    import sys
+    sys.stdout.flush()
+
+    result = subprocess.run(extract_cmd)
+
+    print(f"   ✅ Segment extrait (code retour: {result.returncode})")
+    sys.stdout.flush()
+
     if result.returncode != 0:
-        print(f"❌ Erreur extraction : {result.stderr}")
-        raise Exception(f"Échec extraction segment: {result.stderr}")
+        print(f"❌ Erreur extraction : code retour {result.returncode}")
+        raise Exception(f"Échec extraction segment: code retour {result.returncode}")
 
     if progress_callback:
         progress_callback(65, "Segment extrait, préparation des sous-titres...")
@@ -376,14 +384,23 @@ def create_short_video_fast(input_video: str, output_path: str, language: str = 
         progress_thread = threading.Thread(target=simulate_progress, daemon=True)
         progress_thread.start()
 
-    result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+    print(f"   ▶️  Démarrage FFmpeg (cela peut prendre 10-30s pour un segment de 40s)...")
+    print(f"   📊 Commande : {' '.join(ffmpeg_cmd[:5])}... ({len(ffmpeg_cmd)} arguments)")
+    import sys
+    sys.stdout.flush()
+
+    # Lancer FFmpeg SANS capturer la sortie pour voir la progression en temps réel
+    result = subprocess.run(ffmpeg_cmd)
 
     # Arrêter la simulation de progression
     ffmpeg_done.set()
 
+    print(f"   ✅ FFmpeg terminé (code retour: {result.returncode})")
+    sys.stdout.flush()
+
     if result.returncode != 0:
-        print(f"❌ Erreur FFmpeg: {result.stderr}")
-        raise Exception(f"Échec FFmpeg: {result.stderr}")
+        print(f"❌ Erreur FFmpeg (code {result.returncode})")
+        raise Exception(f"Échec FFmpeg: code retour {result.returncode}")
 
     if progress_callback:
         progress_callback(90, "Finalisation du short...")

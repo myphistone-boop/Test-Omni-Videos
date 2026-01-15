@@ -171,33 +171,122 @@ def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless:
                 video_duration = 0
 
             # Chercher le SVG heatmap dans le DOM
-            print("🔍 [STEP 7] Recherche du SVG heatmap...")
-            print("   → Hover sur la barre de progression pour déclencher le SVG...")
+            print("🔍 [STEP 7] Interaction avec le player et recherche du heatmap...")
 
-            # Hover sur la progress bar pour faire apparaître le heatmap
+            # Stratégie d'interaction améliorée
             try:
-                # Trouver la progress bar
-                progress_bar = page.locator('.ytp-progress-bar-container').first
-                if progress_bar:
-                    print("   ✅ Progress bar trouvée")
-                    # Hover dessus pour déclencher le SVG
-                    progress_bar.hover()
-                    time.sleep(2)
-                    print("   ✅ Hover effectué")
-            except Exception as e:
-                print(f"   ⚠️  Impossible de hover: {e}")
+                # 1. Cliquer sur la vidéo pour activer le player
+                print("   → Clic sur la vidéo pour activer le player...")
+                video = page.locator('video').first
+                if video:
+                    video.click()
+                    time.sleep(1)
+                    print("   ✅ Vidéo cliquée")
 
-            # Extraire le SVG path
-            print("📊 [STEP 8] Extraction du SVG path...")
+                # 2. Hover sur le player pour faire apparaître les contrôles
+                print("   → Hover sur le player...")
+                player = page.locator('#movie_player').first
+                if player:
+                    player.hover()
+                    time.sleep(1.5)
+                    print("   ✅ Hover sur le player effectué")
+
+                # 3. Hover spécifiquement sur la progress bar
+                print("   → Hover sur la barre de progression...")
+                progress_selectors = [
+                    '.ytp-progress-bar-container',
+                    '.ytp-progress-bar',
+                    '#movie_player .ytp-progress-bar-container'
+                ]
+
+                progress_found = False
+                for selector in progress_selectors:
+                    try:
+                        progress = page.locator(selector).first
+                        if progress:
+                            progress.hover()
+                            time.sleep(2)
+                            print(f"   ✅ Hover effectué sur {selector}")
+                            progress_found = True
+                            break
+                    except:
+                        continue
+
+                if not progress_found:
+                    print("   ⚠️  Progress bar non trouvée, continuation quand même...")
+
+            except Exception as e:
+                print(f"   ⚠️  Erreur interaction: {e}")
+
+            # Extraire le SVG path avec plusieurs stratégies
+            print("📊 [STEP 8] Extraction du SVG path (essai de plusieurs méthodes)...")
+
+            svg_path_data = None
+
+            # Stratégie 1: Sélecteur classique
             svg_path_data = page.evaluate('''() => {
                 const svg = document.querySelector('svg.ytp-heat-map-svg');
                 if (!svg) return null;
-
-                const path = svg.querySelector('path.ytp-heat-map-path');
-                if (!path) return null;
-
-                return path.getAttribute('d');
+                const path = svg.querySelector('path.ytp-heat-map-path') ||
+                             svg.querySelector('path');
+                return path ? path.getAttribute('d') : null;
             }''')
+
+            if svg_path_data:
+                print("   ✅ [Stratégie 1] SVG trouvé avec sélecteur classique")
+            else:
+                # Stratégie 2: Chercher n'importe quel SVG avec "heat" dans la classe
+                print("   → [Stratégie 2] Recherche avec sélecteurs alternatifs...")
+                svg_path_data = page.evaluate('''() => {
+                    const selectors = [
+                        'svg[class*="heat"]',
+                        '.ytp-heat-map-svg',
+                        '#movie_player svg[class*="heat"]',
+                        '.ytp-progress-bar svg',
+                        '.ytp-progress-bar-container svg'
+                    ];
+
+                    for (const selector of selectors) {
+                        const svg = document.querySelector(selector);
+                        if (svg) {
+                            const path = svg.querySelector('path');
+                            if (path) {
+                                const d = path.getAttribute('d');
+                                if (d && d.length > 50) {
+                                    return d;
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                }''')
+
+                if svg_path_data:
+                    print("   ✅ [Stratégie 2] SVG trouvé avec sélecteurs alternatifs")
+
+            # Stratégie 3: Si toujours rien, chercher TOUS les SVG et filtrer
+            if not svg_path_data:
+                print("   → [Stratégie 3] Analyse de tous les SVG de la page...")
+                svg_path_data = page.evaluate('''() => {
+                    const allSvgs = Array.from(document.querySelectorAll('svg'));
+
+                    for (const svg of allSvgs) {
+                        const path = svg.querySelector('path');
+                        if (path) {
+                            const d = path.getAttribute('d');
+                            // Le path du heatmap commence généralement par "M5" ou "M 5"
+                            // et contient des courbes Bézier (C)
+                            if (d && d.length > 100 && d.includes('C') &&
+                                (d.startsWith('M5') || d.startsWith('M 5'))) {
+                                return d;
+                            }
+                        }
+                    }
+                    return null;
+                }''')
+
+                if svg_path_data:
+                    print("   ✅ [Stratégie 3] SVG trouvé par analyse de tous les paths")
 
             moments = []
 
@@ -281,11 +370,33 @@ def get_most_replayed_moments(video_url: str, cookie_file: str = None, headless:
                         print(f"      • {m['start']:.1f}s - {m['end']:.1f}s (score: {m['score']:.2f})")
 
             else:
-                print("   ❌ Aucun SVG heatmap trouvé dans la page")
+                print("   ❌ Aucun SVG heatmap trouvé après toutes les stratégies")
+                print("")
+                print("   💡 Debug: Analyse des SVG présents sur la page...")
+                debug_info = page.evaluate('''() => {
+                    const allSvgs = Array.from(document.querySelectorAll('svg'));
+                    return {
+                        totalSvgs: allSvgs.length,
+                        svgsWithPaths: allSvgs.filter(s => s.querySelector('path')).length,
+                        svgsInPlayer: Array.from(
+                            (document.querySelector('#movie_player') || document.body)
+                            .querySelectorAll('svg')
+                        ).length
+                    };
+                }''')
+                print(f"      • Total SVG sur la page: {debug_info['totalSvgs']}")
+                print(f"      • SVG avec paths: {debug_info['svgsWithPaths']}")
+                print(f"      • SVG dans le player: {debug_info['svgsInPlayer']}")
+                print("")
                 print("   💡 Raisons possibles:")
-                print("      - La vidéo n'a pas assez de vues (< 90k)")
+                print("      - La vidéo n'a pas assez de vues (généralement < 90k)")
                 print("      - La vidéo est trop récente (< 5-7 jours)")
-                print("      - YouTube n'a pas généré de heatmap")
+                print("      - YouTube n'a pas généré de heatmap pour cette vidéo")
+                print("      - Le heatmap nécessite une interaction supplémentaire")
+                print("")
+                print("   🔧 Suggestion: Essayer le script de debug:")
+                print("      venv/bin/python3 debug_heatmap_location.py \"URL\"")
+                print("")
 
             # Fermer
             print("🔒 [STEP 11] Fermeture du navigateur...")

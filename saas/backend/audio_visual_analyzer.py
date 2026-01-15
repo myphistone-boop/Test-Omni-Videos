@@ -375,7 +375,7 @@ def detect_candidate_segments(audio_features: Dict, video_duration: float, max_c
 
 def analyze_video(video_path: str, video_duration: float) -> List[Dict]:
     """
-    Pipeline complet d'analyse audio-visuelle
+    Pipeline complet d'analyse AUDIO UNIQUEMENT (visuel désactivé pour vitesse)
 
     Returns:
         [
@@ -383,7 +383,7 @@ def analyze_video(video_path: str, video_duration: float) -> List[Dict]:
                 'start': float,
                 'end': float,
                 'audio_score': float,
-                'visual_score': float,
+                'visual_score': float,  # Toujours 0 maintenant
                 'combined_score': float,
                 'reason': str
             }
@@ -391,7 +391,7 @@ def analyze_video(video_path: str, video_duration: float) -> List[Dict]:
         Trié par combined_score décroissant
     """
     log("\n" + "=" * 80)
-    log("🚀 DÉMARRAGE ANALYSE AUDIO-VISUELLE", "INFO")
+    log("🚀 DÉMARRAGE ANALYSE AUDIO UNIQUEMENT (visuel désactivé)", "INFO")
     log("=" * 80)
     log(f"Vidéo : {video_path}", "INFO")
     log(f"Durée : {video_duration:.1f}s", "INFO")
@@ -409,37 +409,30 @@ def analyze_video(video_path: str, video_duration: float) -> List[Dict]:
         log("Aucun candidat détecté", "WARNING")
         return []
 
-    # 3. Analyse visuelle sur les candidats
-    segments = [(c['start'], c['end']) for c in candidates]
-    visual_features = extract_visual_features(video_path, segments, fps=2)
-
-    # 4. Combiner scores
+    # 3. SKIP analyse visuelle (trop lent)
     log("=" * 80)
-    log("🎯 CALCUL SCORES COMBINÉS", "INFO")
+    log("⚡ ANALYSE VISUELLE DÉSACTIVÉE (pour vitesse)", "INFO")
     log("=" * 80)
+    log("Utilisation du score audio uniquement")
+    log("")
 
-    # Normaliser les scores visuels
-    motion_scores = visual_features['motion_scores']
-    if motion_scores:
-        max_motion = max(motion_scores.values())
-        if max_motion > 0:
-            for idx in motion_scores:
-                motion_scores[idx] /= max_motion
+    # 4. Utiliser seulement le score audio
+    log("=" * 80)
+    log("🎯 CALCUL SCORES (AUDIO UNIQUEMENT)", "INFO")
+    log("=" * 80)
 
     for i, candidate in enumerate(candidates):
         audio_score = candidate['audio_score']
-        visual_score = motion_scores.get(i, 0.0)
+        visual_score = 0.0  # Désactivé
 
-        # Score combiné : 50% audio + 30% visuel + 20% bonus si les deux sont forts
-        combined = 0.5 * audio_score + 0.3 * visual_score
-        if audio_score > 0.7 and visual_score > 0.5:
-            combined += 0.2  # Bonus synérgique
+        # Score combiné = 100% audio (pas de visuel)
+        combined = audio_score
 
         candidate['visual_score'] = visual_score
-        candidate['combined_score'] = min(1.0, combined)
+        candidate['combined_score'] = combined
 
         log(f"Candidat #{i+1} : {candidate['start']:.1f}s - {candidate['end']:.1f}s", "INFO")
-        log(f"   Audio : {audio_score:.2f} | Visuel : {visual_score:.2f} | Combiné : {combined:.2f}", "DEBUG")
+        log(f"   Audio : {audio_score:.2f} | Combiné : {combined:.2f}", "DEBUG")
         log(f"   Raison : {candidate['reason']}", "DEBUG")
 
     # Trier par score combiné
@@ -447,7 +440,7 @@ def analyze_video(video_path: str, video_duration: float) -> List[Dict]:
 
     log("")
     log("=" * 80)
-    log(f"✅ TOP 5 CANDIDATS", "SUCCESS")
+    log(f"✅ TOP 5 CANDIDATS (AUDIO UNIQUEMENT)", "SUCCESS")
     log("=" * 80)
     for i, c in enumerate(candidates[:5]):
         log(f"#{i+1} : {c['start']:.1f}s - {c['end']:.1f}s | Score: {c['combined_score']:.2f} | {c['reason']}", "INFO")

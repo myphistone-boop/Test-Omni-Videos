@@ -71,16 +71,17 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
 
 def download_video(url: str, output_path: str, cookies_path: str = None):
     """
-    Télécharge une vidéo YouTube (essaie SANS cookies d'abord)
+    Télécharge une vidéo YouTube (utilise automatiquement le cookie serveur si disponible)
 
-    Stratégie simple:
-    1. Essayer SANS cookies (fonctionne pour 60-80% des vidéos)
-    2. Si échec avec erreur "bot" → message clair pour l'utilisateur
+    Stratégie:
+    1. Si cookie serveur existe → l'utiliser
+    2. Sinon → essayer sans cookies (mode public)
+    3. Si échec → message clair
 
     Args:
         url: URL de la vidéo YouTube
         output_path: Chemin complet où sauvegarder la vidéo
-        cookies_path: Chemin vers fichier cookies.txt (optionnel, ignoré pour l'instant)
+        cookies_path: Chemin vers fichier cookies.txt (optionnel)
 
     Returns:
         str: Chemin du fichier téléchargé
@@ -89,22 +90,36 @@ def download_video(url: str, output_path: str, cookies_path: str = None):
         Exception: Si téléchargement échoue
     """
 
-    print("🎬 Tentative de téléchargement SANS cookies...")
+    # Si pas de cookies_path fourni, chercher le cookie serveur
+    if cookies_path is None:
+        server_cookie = "/home/shorts/cookies/account_1.txt"
+        if os.path.exists(server_cookie):
+            cookies_path = server_cookie
+            print("🍪 Cookie serveur trouvé et utilisé automatiquement")
+        else:
+            print("🎬 Aucun cookie serveur, tentative en mode public...")
 
     try:
-        # Essayer SANS cookies (fonctionne pour la plupart des vidéos publiques)
-        return download_with_ytdlp(url, output_path, cookies_path=None)
+        # Télécharger avec le cookie (si disponible) ou sans
+        return download_with_ytdlp(url, output_path, cookies_path=cookies_path)
 
     except Exception as e:
         error_msg = str(e)
 
         # Vérifier si c'est une erreur de détection bot
         if "Sign in" in error_msg or "bot" in error_msg.lower():
-            raise Exception(
-                "⚠️ YouTube a détecté un comportement automatisé. "
-                "Cette vidéo nécessite des cookies YouTube. "
-                "Contactez le support pour activer le mode authentifié."
-            )
+            if cookies_path is None:
+                raise Exception(
+                    "⚠️ YouTube a détecté un comportement automatisé. "
+                    "Cette vidéo nécessite des cookies YouTube. "
+                    "Uploadez un cookie via l'interface pour continuer."
+                )
+            else:
+                raise Exception(
+                    "⚠️ YouTube a détecté un comportement automatisé même avec cookies. "
+                    "Le cookie est peut-être expiré ou invalide. "
+                    "Uploadez un nouveau cookie via l'interface."
+                )
 
         # Autre erreur
         raise Exception(f"Échec du téléchargement: {error_msg}")
@@ -114,12 +129,12 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
     """
     Télécharge les sous-titres YouTube DIRECTEMENT via l'API (ULTRA-RAPIDE!)
 
-    Essaie SANS cookies (fonctionne pour 90% des vidéos publiques)
+    Utilise automatiquement le cookie serveur si disponible
 
     Args:
         url: URL YouTube
         language: Code langue (fr, en, etc.)
-        cookies_path: Chemin cookies (optionnel, ignoré)
+        cookies_path: Chemin cookies (optionnel)
 
     Returns:
         list[dict]: Liste de mots avec timestamps au format Whisper
@@ -127,10 +142,17 @@ def download_youtube_subtitles(url: str, language: str = "fr", cookies_path: str
         None: Si pas de sous-titres disponibles
     """
 
+    # Si pas de cookies_path fourni, chercher le cookie serveur
+    if cookies_path is None:
+        server_cookie = "/home/shorts/cookies/account_1.txt"
+        if os.path.exists(server_cookie):
+            cookies_path = server_cookie
+            print("🍪 Cookie serveur trouvé pour les sous-titres")
+
     print(f"🎬 Récupération DIRECTE des sous-titres YouTube...")
     print(f"   URL: {url}")
     print(f"   Langue: {language}")
-    print(f"   Mode: SANS cookies (public)")
+    print(f"   Mode: {'AVEC cookies' if cookies_path else 'SANS cookies (public)'}")
 
     # Extraire l'ID vidéo de l'URL
     import re

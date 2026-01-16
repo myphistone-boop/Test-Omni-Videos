@@ -52,11 +52,20 @@ def telecharger_video(url, output_path=None, cookies_path=None):
             # Obtenir le vrai nom du fichier téléchargé (avec la bonne extension)
             final_path = ydl.prepare_filename(info)
 
-        # Vérifier que le fichier existe
+        # Vérifier que le fichier existe et n'est pas vide
         if not os.path.exists(final_path):
             raise FileNotFoundError(f"Le fichier téléchargé n'existe pas : {final_path}")
 
-        print(f"\n✅ Téléchargement terminé : {final_path}")
+        file_size = os.path.getsize(final_path)
+        if file_size == 0:
+            os.remove(final_path)  # Supprimer le fichier vide
+            raise Exception(
+                "Le téléchargement a échoué (fichier vide). "
+                "Vérifiez que vos cookies YouTube sont valides et à jour. "
+                "La vidéo est peut-être protégée ou nécessite une connexion."
+            )
+
+        print(f"\n✅ Téléchargement terminé : {final_path} ({file_size / 1024 / 1024:.1f} MB)")
         return final_path
 
     except Exception as e:

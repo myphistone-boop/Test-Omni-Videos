@@ -34,12 +34,13 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
     # Options yt-dlp - Laisser choisir automatiquement le meilleur client
     ydl_opts = {
         'outtmpl': output_path,
-        'format': 'best',  # Accepte n'importe quel format disponible
+        'format': 'bv*+ba/b',  # Évite les formats HLS qui donnent 403
         'merge_output_format': 'mp4',  # Convertit en MP4 après téléchargement
         'quiet': False,  # Verbose pour debug
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
+        'extractor_args': {'youtube': {'skip': ['hls', 'dash']}},  # Skip HLS/DASH qui donnent 403
         # Ne pas spécifier de client - laisser yt-dlp choisir automatiquement
         # avec les cookies fournis
     }

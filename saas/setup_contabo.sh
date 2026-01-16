@@ -234,18 +234,14 @@ echo "======================================================================"
 echo "⚙️  Étape 8/10: Configuration environnement"
 echo "======================================================================"
 
-# Demander la clé OpenAI (REQUIS pour transcription Whisper)
+# Demander la clé OpenAI (optionnel, peut être configuré après)
 echo ""
-log_info "🔑 Clé API OpenAI requise pour la transcription Whisper"
+log_info "🔑 Clé API OpenAI pour la transcription Whisper"
 log_info "Obtenez votre clé sur: https://platform.openai.com/api-keys"
 log_info "Coût: ~0.006\$/minute de vidéo"
+log_info "Vous pouvez la configurer maintenant OU après avec: bash saas/configure_openai.sh"
 echo ""
-read -p "Clé OpenAI (sk-...): " OPENAI_KEY
-
-if [ -z "$OPENAI_KEY" ]; then
-    log_error "La clé OpenAI est obligatoire pour le fonctionnement"
-    exit 1
-fi
+read -p "Clé OpenAI (sk-...) [appuyez sur Entrée pour configurer après]: " OPENAI_KEY
 
 # Créer le fichier .env avec TOUTES les variables nécessaires
 cat > /home/shorts/Test-Omni-Videos/saas/backend/.env << EOF
@@ -254,8 +250,9 @@ API_HOST=0.0.0.0
 API_PORT=8000
 OUTPUT_DIR=/home/shorts/videos_output
 
-# OpenAI Whisper (REQUIS)
-OPENAI_API_KEY=$OPENAI_KEY
+# OpenAI Whisper (REQUIS pour fonctionner)
+# Configurez avec: bash saas/configure_openai.sh
+OPENAI_API_KEY=${OPENAI_KEY:-YOUR_OPENAI_KEY_HERE}
 
 # Database & Cache
 DATABASE_URL=postgresql://shorts:$DB_PASSWORD@localhost/shorts_db
@@ -268,7 +265,11 @@ chown shorts:shorts /home/shorts/Test-Omni-Videos/saas/backend/.env
 mkdir -p /home/shorts/videos_output
 chown -R shorts:shorts /home/shorts/videos_output
 
-log_success "Configuration créée avec clé OpenAI"
+if [ -z "$OPENAI_KEY" ]; then
+    log_success "Configuration créée (configurez OpenAI après avec: bash saas/configure_openai.sh)"
+else
+    log_success "Configuration créée avec clé OpenAI"
+fi
 
 ###############################################################################
 # 9. SETUP SYSTEMD SERVICE
@@ -559,7 +560,14 @@ echo "     • Status services: sudo systemctl status shorts-api"
 echo "     • Voir credentials: cat /root/.shorts_credentials"
 echo ""
 echo "⚠️  PROCHAINES ÉTAPES:"
-echo "  1. ✅ Sauvegardez /root/.shorts_credentials dans un lieu sûr"
+if [ -z "$OPENAI_KEY" ]; then
+    echo "  1. 🔑 IMPORTANT: Configurez votre clé OpenAI:"
+    echo "     cd /home/shorts/Test-Omni-Videos && bash saas/configure_openai.sh"
+    echo "     OU éditez manuellement: /home/shorts/Test-Omni-Videos/saas/backend/.env"
+    echo "  2. ✅ Sauvegardez /root/.shorts_credentials dans un lieu sûr"
+else
+    echo "  1. ✅ Sauvegardez /root/.shorts_credentials dans un lieu sûr"
+fi
 echo "  2. 🌐 Testez l'API: curl $FRONTEND_API_URL/"
 if [[ $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
     echo "  3. 🎨 Accédez au frontend: https://$DOMAIN/app/"

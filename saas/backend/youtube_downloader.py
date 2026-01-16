@@ -31,20 +31,17 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
     print(f"[DEBUG] URL: {url}")
     print(f"[DEBUG] Cookies: {cookies_file} (exists: {Path(cookies_file).exists()})")
 
-    # Options yt-dlp - Laisser choisir automatiquement le meilleur client
+    # Options yt-dlp - Configuration permissive pour maximiser compatibilité
     ydl_opts = {
         'outtmpl': output_path,
-        'format': 'bv*+ba/b',  # Évite les formats HLS qui donnent 403
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',  # Accepte tous formats jusqu'à 1080p
         'merge_output_format': 'mp4',  # Convertit en MP4 après téléchargement
         'quiet': False,  # Verbose pour debug
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        'extractor_args': {
-            'youtube': {
-                'skip': ['hls', 'dash'],  # Skip HLS/DASH qui donnent 403
-                'player_client': ['android', 'web'],  # Essayer Android d'abord (contourne certains blocs)
-            }
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         # Ne pas spécifier de client - laisser yt-dlp choisir automatiquement
         # avec les cookies fournis

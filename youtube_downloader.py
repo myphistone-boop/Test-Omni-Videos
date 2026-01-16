@@ -7,12 +7,14 @@ import yt_dlp
 import os
 
 
-def telecharger_video(url):
+def telecharger_video(url, output_path=None, cookies_path=None):
     """
     Télécharge une vidéo YouTube à partir de son URL
 
     Args:
         url (str): L'URL de la vidéo YouTube
+        output_path (str): Chemin de sortie (optionnel, sinon videos_telechargees/)
+        cookies_path (str): Chemin vers cookies.txt (optionnel)
     """
     # Créer un dossier pour les téléchargements s'il n'existe pas
     dossier_telechargement = "videos_telechargees"
@@ -22,11 +24,16 @@ def telecharger_video(url):
     # Configuration des options de téléchargement
     options = {
         'format': 'best',  # Meilleure qualité disponible
-        'outtmpl': f'{dossier_telechargement}/%(title)s.%(ext)s',  # Nom du fichier
+        'outtmpl': output_path if output_path else f'{dossier_telechargement}/%(title)s.%(ext)s',  # Nom du fichier
         'quiet': False,  # Afficher la progression
         'no_warnings': False,
         'nocheckcertificate': True,  # Désactiver vérification SSL (nécessaire sur PC d'entreprise avec proxy)
     }
+
+    # Ajouter cookies si fournis
+    if cookies_path and os.path.exists(cookies_path):
+        options['cookiefile'] = cookies_path
+        print(f"🍪 Utilisation des cookies: {cookies_path}")
 
     try:
         print(f"\n🎬 Téléchargement de la vidéo depuis : {url}")

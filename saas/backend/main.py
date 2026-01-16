@@ -230,7 +230,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
         jobs_db[job_id]["message"] = "Téléchargement de la vidéo..."
 
         # Import des modules de processing
-        from youtube_downloader import download_video
+        from youtube_downloader import telecharger_video
 
         jobs_db[job_id]["progress"] = 30
         jobs_db[job_id]["message"] = "Extraction du segment viral..."
@@ -240,7 +240,7 @@ def process_video_task(job_id: str, video_url: str, language: str, target_platfo
 
         # Télécharger la vidéo
         temp_video = str(Path(tempfile.gettempdir()) / f"{job_id}_original.mp4")
-        download_video(video_url, temp_video, cookies_path=cookies_path)
+        temp_video = telecharger_video(video_url, temp_video, cookies_path=cookies_path)
 
         jobs_db[job_id]["progress"] = 50
         jobs_db[job_id]["message"] = "Génération des sous-titres..."

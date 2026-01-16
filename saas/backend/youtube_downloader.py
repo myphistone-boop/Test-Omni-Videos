@@ -1,100 +1,85 @@
+#!/usr/bin/env python3
 """
-YouTube downloader pour le backend SaaS
-Télécharge des vidéos YouTube via yt-dlp avec cookies utilisateur
+Script simple pour télécharger des vidéos YouTube
 """
 
 import yt_dlp
 import os
-from pathlib import Path
 
 
-def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) -> str:
+def telecharger_video(url, output_path=None, cookies_path=None):
     """
-    Télécharge via yt-dlp (avec ou sans cookies)
+    Télécharge une vidéo YouTube à partir de son URL
 
     Args:
-        url: URL YouTube
-        output_path: Chemin de sortie
-        cookies_path: Chemin cookies (optionnel)
-
-    Returns:
-        str: Chemin du fichier
+        url (str): L'URL de la vidéo YouTube
+        output_path (str): Chemin de sortie (optionnel, sinon videos_telechargees/)
+        cookies_path (str): Chemin vers cookies.txt (optionnel)
     """
+    # Créer un dossier pour les téléchargements s'il n'existe pas
+    dossier_telechargement = "videos_telechargees"
+    if not os.path.exists(dossier_telechargement):
+        os.makedirs(dossier_telechargement)
 
-    # Utiliser le cookies_path fourni, sinon fallback sur le global
-    if cookies_path is None:
-        cookies_path = "/home/shorts/cookies.txt"
-
-    cookies_file = cookies_path
-
-    # Log pour debug
-    print(f"[DEBUG] URL: {url}")
-    print(f"[DEBUG] Cookies: {cookies_file} (exists: {Path(cookies_file).exists()})")
-
-    # Options yt-dlp - Laisser choisir automatiquement le meilleur client
-    ydl_opts = {
-        'outtmpl': output_path,
-        'quiet': False,  # Verbose pour debug
+    # Configuration des options de téléchargement
+    options = {
+        'format': 'best',  # Meilleure qualité disponible
+        'outtmpl': output_path if output_path else f'{dossier_telechargement}/%(title)s.%(ext)s',  # Nom du fichier
+        'quiet': False,  # Afficher la progression
         'no_warnings': False,
-        'nocheckcertificate': True,
-        'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        # Ne pas spécifier de client - laisser yt-dlp choisir automatiquement
-        # avec les cookies fournis
+        'nocheckcertificate': True,  # Désactiver vérification SSL (nécessaire sur PC d'entreprise avec proxy)
     }
 
-    print(f"[DEBUG] Starting download...")
+    # Ajouter cookies si fournis
+    if cookies_path and os.path.exists(cookies_path):
+        options['cookiefile'] = cookies_path
+        print(f"🍪 Utilisation des cookies: {cookies_path}")
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        # D'abord extraire les infos pour voir ce qui est disponible
-        try:
-            info = ydl.extract_info(url, download=False)
-            print(f"[DEBUG] Video title: {info.get('title', 'Unknown')}")
-            print(f"[DEBUG] Available formats count: {len(info.get('formats', []))}")
+    try:
+        print(f"\n🎬 Téléchargement de la vidéo depuis : {url}")
+        print("-" * 60)
 
-            # Afficher les 5 meilleurs formats
-            if 'formats' in info and info['formats']:
-                print(f"[DEBUG] Top formats available:")
-                for i, fmt in enumerate(info['formats'][:5]):
-                    print(f"  - {fmt.get('format_id')}: {fmt.get('ext')} {fmt.get('resolution', 'audio')} {fmt.get('filesize', 0) / 1024 / 1024:.1f}MB")
-        except Exception as e:
-            print(f"[DEBUG] Error extracting info: {e}")
-            raise
+        final_path = None
+        with yt_dlp.YoutubeDL(options) as ydl:
+            # Récupérer les informations et télécharger
+            info = ydl.extract_info(url, download=True)
+            titre = info.get('title', 'Titre inconnu')
+            duree = info.get('duration', 0)
 
-        # Maintenant télécharger
-        print(f"[DEBUG] Downloading...")
-        ydl.download([url])
+            print(f"📝 Titre : {titre}")
+            print(f"⏱️  Durée : {duree // 60}:{duree % 60:02d}")
 
-    print(f"[DEBUG] Download complete: {output_path}")
-    return output_path
+            # Obtenir le vrai nom du fichier téléchargé (avec la bonne extension)
+            final_path = ydl.prepare_filename(info)
+
+        # Vérifier que le fichier existe
+        if not os.path.exists(final_path):
+            raise FileNotFoundError(f"Le fichier téléchargé n'existe pas : {final_path}")
+
+        print(f"\n✅ Téléchargement terminé : {final_path}")
+        return final_path
+
+    except Exception as e:
+        print(f"\n❌ Erreur lors du téléchargement : {e}")
+        raise
 
 
-def download_video(url: str, output_path: str, cookies_path: str = None):
-    """
-    Télécharge une vidéo YouTube
+def main():
+    """Fonction principale"""
+    print("=" * 60)
+    print("🎥  TÉLÉCHARGEUR DE VIDÉOS YOUTUBE  🎥")
+    print("=" * 60)
 
-    Stratégie simple:
-    - Si cookies fournis → téléchargement avec yt-dlp
-    - Sinon → erreur explicite demandant les cookies
+    # Demander l'URL à l'utilisateur
+    url = input("\n📎 Entrez l'URL de la vidéo YouTube : ").strip()
 
-    Args:
-        url: URL de la vidéo YouTube
-        output_path: Chemin complet où sauvegarder la vidéo
-        cookies_path: Chemin vers le fichier cookies.txt (REQUIS)
+    if not url:
+        print("❌ Erreur : URL vide. Veuillez entrer une URL valide.")
+        return
 
-    Returns:
-        str: Chemin du fichier téléchargé
+    # Télécharger la vidéo
+    telecharger_video(url)
 
-    Raises:
-        Exception: Si pas de cookies ou échec du téléchargement
-    """
 
-    # Vérifier si les cookies sont fournis
-    if not cookies_path or not Path(cookies_path).exists():
-        raise Exception(
-            "Cookies YouTube requis pour télécharger les vidéos. "
-            "Veuillez uploader votre fichier cookies.txt. "
-            "Instructions: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
-        )
-
-    # Télécharger avec cookies
-    return download_with_ytdlp(url, output_path, cookies_path)
+if __name__ == "__main__":
+    main()

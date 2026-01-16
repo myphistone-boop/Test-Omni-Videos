@@ -39,24 +39,29 @@ def telecharger_video(url, output_path=None, cookies_path=None):
         print(f"\n🎬 Téléchargement de la vidéo depuis : {url}")
         print("-" * 60)
 
+        final_path = None
         with yt_dlp.YoutubeDL(options) as ydl:
-            # Récupérer les informations de la vidéo
-            info = ydl.extract_info(url, download=False)
+            # Récupérer les informations et télécharger
+            info = ydl.extract_info(url, download=True)
             titre = info.get('title', 'Titre inconnu')
             duree = info.get('duration', 0)
 
             print(f"📝 Titre : {titre}")
             print(f"⏱️  Durée : {duree // 60}:{duree % 60:02d}")
-            print()
 
-            # Télécharger la vidéo
-            ydl.download([url])
+            # Obtenir le vrai nom du fichier téléchargé (avec la bonne extension)
+            final_path = ydl.prepare_filename(info)
 
-        print("\n✅ Téléchargement terminé avec succès !")
-        print(f"📁 Vidéo sauvegardée dans : {dossier_telechargement}/")
+        # Vérifier que le fichier existe
+        if not os.path.exists(final_path):
+            raise FileNotFoundError(f"Le fichier téléchargé n'existe pas : {final_path}")
+
+        print(f"\n✅ Téléchargement terminé : {final_path}")
+        return final_path
 
     except Exception as e:
         print(f"\n❌ Erreur lors du téléchargement : {e}")
+        raise
 
 
 def main():

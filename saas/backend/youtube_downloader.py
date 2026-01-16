@@ -40,7 +40,13 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
         'no_warnings': False,
         'nocheckcertificate': True,
         'cookiefile': cookies_file if Path(cookies_file).exists() else None,
-        'extractor_args': {'youtube': {'skip': ['hls', 'dash']}},  # Skip HLS/DASH qui donnent 403
+        'extractor_args': {
+            'youtube': {
+                'skip': ['hls', 'dash'],  # Skip HLS/DASH qui donnent 403
+                'player_client': ['android', 'web'],  # Essayer Android d'abord (contourne certains blocs)
+            }
+        },
+        'js_runtimes': ['node:/usr/bin/node'],  # Forcer l'utilisation de Node.js pour résoudre le n-challenge
         # Ne pas spécifier de client - laisser yt-dlp choisir automatiquement
         # avec les cookies fournis
     }

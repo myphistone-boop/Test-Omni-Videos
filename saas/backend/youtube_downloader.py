@@ -34,7 +34,8 @@ def download_with_ytdlp(url: str, output_path: str, cookies_path: str = None) ->
     # Options yt-dlp - Laisser choisir automatiquement le meilleur client
     ydl_opts = {
         'outtmpl': output_path,
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # Force le meilleur format MP4 disponible
+        'format': 'best',  # Accepte n'importe quel format disponible
+        'merge_output_format': 'mp4',  # Convertit en MP4 après téléchargement
         'quiet': False,  # Verbose pour debug
         'no_warnings': False,
         'nocheckcertificate': True,

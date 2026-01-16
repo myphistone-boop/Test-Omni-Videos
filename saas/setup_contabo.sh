@@ -234,10 +234,30 @@ echo "======================================================================"
 echo "⚙️  Étape 8/10: Configuration environnement"
 echo "======================================================================"
 
+# Demander la clé OpenAI (REQUIS pour transcription Whisper)
+echo ""
+log_info "🔑 Clé API OpenAI requise pour la transcription Whisper"
+log_info "Obtenez votre clé sur: https://platform.openai.com/api-keys"
+log_info "Coût: ~0.006\$/minute de vidéo"
+echo ""
+read -p "Clé OpenAI (sk-...): " OPENAI_KEY
+
+if [ -z "$OPENAI_KEY" ]; then
+    log_error "La clé OpenAI est obligatoire pour le fonctionnement"
+    exit 1
+fi
+
+# Créer le fichier .env avec TOUTES les variables nécessaires
 cat > /home/shorts/Test-Omni-Videos/saas/backend/.env << EOF
+# API Configuration
 API_HOST=0.0.0.0
 API_PORT=8000
 OUTPUT_DIR=/home/shorts/videos_output
+
+# OpenAI Whisper (REQUIS)
+OPENAI_API_KEY=$OPENAI_KEY
+
+# Database & Cache
 DATABASE_URL=postgresql://shorts:$DB_PASSWORD@localhost/shorts_db
 REDIS_URL=redis://localhost:6379/0
 EOF
@@ -248,7 +268,7 @@ chown shorts:shorts /home/shorts/Test-Omni-Videos/saas/backend/.env
 mkdir -p /home/shorts/videos_output
 chown -R shorts:shorts /home/shorts/videos_output
 
-log_success "Configuration créée"
+log_success "Configuration créée avec clé OpenAI"
 
 ###############################################################################
 # 9. SETUP SYSTEMD SERVICE
@@ -271,12 +291,15 @@ WorkingDirectory=/home/shorts/Test-Omni-Videos/saas/backend
 Environment="PATH=/home/shorts/Test-Omni-Videos/saas/backend/venv/bin"
 EnvironmentFile=/home/shorts/Test-Omni-Videos/saas/backend/.env
 ExecStart=/home/shorts/Test-Omni-Videos/saas/backend/venv/bin/gunicorn main:app \
-    -w 4 \
+    -w 1 \
     -k uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:8000 \
     --timeout 300 \
     --access-logfile /home/shorts/api.log \
     --error-logfile /home/shorts/api-error.log
+
+# Note: -w 1 car l'application utilise un stockage en mémoire (jobs_db dict)
+# Pour scaler avec plusieurs workers, implémenter PostgreSQL/Redis pour les jobs
 
 Restart=always
 RestartSec=10
@@ -425,6 +448,35 @@ echo "y" | ufw enable
 log_success "Firewall configuré"
 
 ###############################################################################
+# CONFIGURER L'URL FRONTEND
+###############################################################################
+
+echo ""
+echo "======================================================================"
+echo "🎨 Configuration URL frontend"
+echo "======================================================================"
+
+# Récupérer l'IP publique
+PUBLIC_IP=$(curl -s ifconfig.me)
+
+# Déterminer l'URL finale
+if [[ $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
+    FRONTEND_API_URL="https://$DOMAIN"
+else
+    FRONTEND_API_URL="http://$PUBLIC_IP"
+fi
+
+# Mettre à jour l'URL dans le frontend
+FRONTEND_FILE="/home/shorts/Test-Omni-Videos/saas/frontend/index.html"
+if [ -f "$FRONTEND_FILE" ]; then
+    # Remplacer l'URL hardcodée par l'URL réelle
+    sed -i "s|const API_URL = 'http://[0-9.]*';|const API_URL = '$FRONTEND_API_URL';|g" "$FRONTEND_FILE"
+    log_success "URL frontend configurée: $FRONTEND_API_URL"
+else
+    log_error "Fichier frontend introuvable"
+fi
+
+###############################################################################
 # SAUVEGARDER CREDENTIALS
 ###############################################################################
 
@@ -448,6 +500,9 @@ Password: $USER_PASSWORD
 DB User: shorts
 DB Password: $DB_PASSWORD
 DB Name: shorts_db
+
+## OpenAI API
+OpenAI Key: $OPENAI_KEY
 
 ## URLs
 EOF
@@ -503,15 +558,26 @@ echo "     • Redémarrer API: sudo systemctl restart shorts-api"
 echo "     • Status services: sudo systemctl status shorts-api"
 echo "     • Voir credentials: cat /root/.shorts_credentials"
 echo ""
-echo "⚠️  ACTION REQUISE:"
-echo "  1. Sauvegardez /root/.shorts_credentials en lieu sûr (password manager)"
-echo "  2. Testez l'accès dans votre navigateur"
-if [[ ! $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
-    echo "  3. Modifiez saas/frontend/index.html ligne 179:"
-    echo "     const API_URL = 'http://$PUBLIC_IP';"
+echo "⚠️  PROCHAINES ÉTAPES:"
+echo "  1. ✅ Sauvegardez /root/.shorts_credentials dans un lieu sûr"
+echo "  2. 🌐 Testez l'API: curl $FRONTEND_API_URL/"
+if [[ $HAS_DOMAIN =~ ^[OoYy]$ ]]; then
+    echo "  3. 🎨 Accédez au frontend: https://$DOMAIN/app/"
+else
+    echo "  3. 🎨 Accédez au frontend: http://$PUBLIC_IP/app/"
 fi
+echo "  4. 🍪 Préparez vos cookies YouTube:"
+echo "     - Installez: https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+echo "     - Allez sur youtube.com (connecté)"
+echo "     - Exportez cookies.txt via l'extension"
+echo "  5. 🚀 Testez avec une vidéo courte d'abord (1-2 minutes)"
+echo ""
+echo "📊 COMMENT VOIR LA PROGRESSION:"
+echo "  • Dans le frontend: Barre de progression avec % et étapes"
+echo "  • Via logs API: sudo journalctl -u shorts-api -f"
+echo "  • Via API direct: curl $FRONTEND_API_URL/api/status/\$JOB_ID"
 echo ""
 echo "======================================================================"
-echo "✅ Installation complète - Votre SaaS est en ligne !"
+echo "✅ Installation complète - Votre SaaS YouTube to Shorts est en ligne !"
 echo "======================================================================"
 echo ""

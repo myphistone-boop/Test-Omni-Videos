@@ -186,7 +186,7 @@ class YouTubeSubtitleGenerator:
 
         except Exception as e:
             print(f"❌ Erreur lors du téléchargement : {e}")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def extraire_audio(self, video_path, video_title):
         """
@@ -223,7 +223,7 @@ class YouTubeSubtitleGenerator:
 
         except Exception as e:
             print(f"❌ Erreur lors de l'extraction audio : {e}")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def transcrire_avec_whisper(self, audio_path, video_title):
         """
@@ -294,7 +294,7 @@ class YouTubeSubtitleGenerator:
 
         except Exception as e:
             print(f"❌ Erreur lors de la transcription : {e}")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def extraire_segment_fixe(self, video_path, transcript, debut, fin, video_title, mode="viral"):
         """
@@ -375,7 +375,7 @@ class YouTubeSubtitleGenerator:
                 choix = input("\n👉 Voulez-vous continuer quand même ? (o/n) : ").strip().lower()
                 if choix != 'o':
                     print("❌ Extraction annulée. Veuillez choisir un autre segment.")
-                    sys.exit(1)
+                    raise Exception("Erreur lors du traitement")
 
             # Créer un objet transcription pour le segment
             class TranscriptSegment:
@@ -397,7 +397,7 @@ class YouTubeSubtitleGenerator:
             print(f"❌ Erreur lors de l'extraction du segment : {e}")
             import traceback
             traceback.print_exc()
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def extraire_segment_aleatoire(self, video_path, transcript, duree_souhaitee, video_title):
         """
@@ -643,7 +643,7 @@ class YouTubeSubtitleGenerator:
             print(f"❌ Erreur lors de la création de la vidéo : {e}")
             import traceback
             traceback.print_exc()
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def grouper_mots(self, mots_timestamps, max_mots=3):
         """Groupe les mots par 2-3 maximum"""
@@ -798,7 +798,7 @@ class YouTubeSubtitleGenerator:
             ]
         else:
             print("❌ Pas de mots avec timestamps dans la transcription")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
         # Créer le texte avec marqueurs de temps toutes les 10 secondes
         texte_avec_temps = []
@@ -898,12 +898,12 @@ Assure-toi que les timestamps correspondent aux marqueurs [Xs] dans la transcrip
         except json.JSONDecodeError as e:
             print(f"❌ Erreur de parsing JSON : {e}")
             print(f"Réponse brute :\n{response_text}")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
         except Exception as e:
             print(f"❌ Erreur lors de l'analyse : {e}")
             import traceback
             traceback.print_exc()
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def choisir_segment_viral(self, analysis, transcript, duree_souhaitee):
         """
@@ -950,7 +950,7 @@ Assure-toi que les timestamps correspondent aux marqueurs [Xs] dans la transcrip
             return None  # Mode aléatoire
         elif choix == 'Q':
             print("👋 Au revoir !")
-            sys.exit(0)
+            return None
         else:
             try:
                 idx = int(choix) - 1
@@ -1713,7 +1713,7 @@ Assure-toi que les timestamps correspondent aux marqueurs [Xs] dans la transcrip
             if process.returncode != 0:
                 stderr = process.stderr.read()
                 print(f"\n❌ Erreur ffmpeg : {stderr}")
-                sys.exit(1)
+                raise Exception("Erreur lors du traitement")
 
             print(f"\n✅ Incrustation terminée !")
 
@@ -1728,7 +1728,7 @@ Assure-toi que les timestamps correspondent aux marqueurs [Xs] dans la transcrip
             print(f"❌ Erreur lors de la création de la vidéo : {e}")
             import traceback
             traceback.print_exc()
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     def creer_video_tiktok_optimisee(self, video_path, transcript, video_title, duree_segment=60):
         """
@@ -2010,7 +2010,7 @@ def main():
         if not sys.stdin or not hasattr(sys.stdin, 'isatty'):
             print("❌ Erreur : stdin n'est pas disponible")
             print("   Le script doit être lancé dans un terminal interactif")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
         generator = YouTubeSubtitleGenerator()
 
@@ -2049,7 +2049,7 @@ def main():
             url = input("\n📎 Entrez l'URL de la vidéo YouTube : ").strip()
             if not url:
                 print("❌ Erreur : URL vide")
-                sys.exit(1)
+                raise Exception("Erreur lors du traitement")
 
             # Pipeline complet : Télécharger → Audio → Transcription → Short TikTok
             generator.traiter_video(url=url, etape_depart=1)
@@ -2063,7 +2063,7 @@ def main():
             if not fichiers['videos']:
                 print("\n❌ Aucune vidéo trouvée dans le dossier output/")
                 print("💡 Utilisez l'Option 1 pour télécharger une vidéo d'abord")
-                sys.exit(1)
+                raise Exception("Erreur lors du traitement")
 
             print("\n📹 VIDÉOS DISPONIBLES :")
             for i, video in enumerate(fichiers['videos'], 1):
@@ -2099,21 +2099,21 @@ def main():
 
         else:
             print("\n❌ Choix invalide. Veuillez choisir 1 ou 2.")
-            sys.exit(1)
+            raise Exception("Erreur lors du traitement")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Processus interrompu par l'utilisateur (Ctrl+C)")
-        sys.exit(1)
+        raise Exception("Erreur lors du traitement")
     except EOFError:
         print("\n\n❌ Erreur : Impossible de lire l'entrée utilisateur")
         print("   Assurez-vous que le script est lancé dans un terminal interactif")
         print("   et non en arrière-plan ou avec stdin redirigé.")
-        sys.exit(1)
+        raise Exception("Erreur lors du traitement")
     except Exception as e:
         print(f"\n❌ Erreur fatale : {e}")
         import traceback
         traceback.print_exc()
-        sys.exit(1)
+        raise Exception("Erreur lors du traitement")
 
 
 def process_video(youtube_url, output_path=None):
